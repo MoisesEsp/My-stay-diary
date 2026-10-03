@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diario de Estudio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="contenedor">
+
+    <header class="cabecera">
+      <h1>Diario de Estudio</h1>
+      <p class="subtitulo">Registra tus sesiones y cuida tu racha</p>
+    </header>
+
+    <!-- Racha actual -->
+    <section class="tarjeta racha">
+      <span class="racha-numero" id="rachaNumero">0</span>
+      <span class="racha-texto">días seguidos estudiando</span>
+    </section>
+
+    <!-- Formulario para registrar una sesión -->
+    <section class="tarjeta">
+      <h2>Nueva sesión</h2>
+      <form id="formulario" novalidate>
+        <div class="campo">
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha" name="fecha" required />
+        </div>
+
+        <div class="campo">
+          <label for="tema">Tema</label>
+          <input type="text" id="tema" name="tema" placeholder="Ej: Matemáticas" required />
+        </div>
+
+        <div class="campo">
+          <label for="minutos">Minutos</label>
+          <input type="number" id="minutos" name="minutos" min="1" placeholder="Ej: 30" required />
+        </div>
+
+        <p class="error" id="error"></p>
+
+        <button type="submit">Guardar sesión</button>
+      </form>
+    </section>
+
+    <!-- Lista de sesiones -->
+    <section class="tarjeta">
+      <h2>Mis sesiones</h2>
+      <ul class="lista-sesiones" id="listaSesiones"></ul>
+      <p class="vacio" id="mensajeVacio">Todavía no hay sesiones. ¡Empieza hoy!</p>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

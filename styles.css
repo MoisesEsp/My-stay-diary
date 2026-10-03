@@ -1,0 +1,202 @@
+/* ---------- Estilos generales ---------- */
+:root {
+  --fondo: #f4f6fb;
+  --tarjeta: #ffffff;
+  --texto: #1f2937;
+  --texto-suave: #6b7280;
+  --principal: #4f46e5;
+  --principal-oscuro: #4338ca;
+  --borde: #e5e7eb;
+  --error: #dc2626;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background-color: var(--fondo);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+.contenedor {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- Cabecera ---------- */
+.cabecera {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.cabecera h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.subtitulo {
+  margin: 4px 0 0;
+  color: var(--texto-suave);
+  font-size: 0.95rem;
+}
+
+/* ---------- Tarjetas ---------- */
+.tarjeta {
+  background-color: var(--tarjeta);
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.tarjeta h2 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+}
+
+/* ---------- Racha ---------- */
+.racha {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  background: linear-gradient(135deg, var(--principal), #7c3aed);
+  color: #ffffff;
+  border: none;
+  padding: 28px 20px;
+}
+
+.racha-numero {
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.racha-texto {
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+/* ---------- Formulario ---------- */
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.campo label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.campo input {
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.campo input:focus {
+  outline: none;
+  border-color: var(--principal);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background-color: var(--principal);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: var(--principal-oscuro);
+}
+
+.error {
+  margin: 0 0 12px;
+  min-height: 1.2em;
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+/* ---------- Lista de sesiones ---------- */
+.lista-sesiones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sesion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background-color: var(--fondo);
+  border-radius: 12px;
+}
+
+.sesion-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sesion-tema {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.sesion-fecha {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+
+.sesion-minutos {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--principal);
+  font-size: 0.95rem;
+}
+
+.vacio {
+  margin: 0;
+  color: var(--texto-suave);
+  text-align: center;
+}
+
+.oculto {
+  display: none;
+}
+
+/* ---------- Móvil ---------- */
+@media (max-width: 480px) {
+  .racha-numero {
+    font-size: 3rem;
+  }
+
+  .tarjeta {
+    padding: 16px;
+  }
+}
