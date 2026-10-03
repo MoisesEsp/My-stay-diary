@@ -150,6 +150,13 @@ button:hover {
   font-size: 0.9rem;
 }
 
+/* Aviso del campo de fecha bloqueado */
+.nota {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
 /* ---------- Lista de sesiones ---------- */
 .lista-sesiones {
   list-style: none;
@@ -203,6 +210,72 @@ button:hover {
   display: none;
 }
 
+/* ---------- Calendario ---------- */
+.calendario-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.calendario-cabecera h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  text-transform: capitalize;
+}
+
+.boton-mes {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background-color: var(--fondo);
+  color: var(--texto);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.boton-mes:hover {
+  background-color: var(--borde);
+}
+
+.boton-mes:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: var(--fondo);
+}
+
+.calendario {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendario .dia-semana {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  padding-bottom: 4px;
+}
+
+.calendario .dia {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+/* Día con al menos una sesión */
+.calendario .dia.estudiado {
+  background-color: var(--principal);
+  color: #ffffff;
+  font-weight: 700;
+}
+
 /* ---------- Móvil ---------- */
 @media (max-width: 480px) {
   .racha-numero {
@@ -219,5 +292,13 @@ button:hover {
 
   .racha {
     padding: 20px 10px;
+  }
+
+  .calendario {
+    gap: 2px;
+  }
+
+  .calendario .dia {
+    font-size: 0.8rem;
   }
 }

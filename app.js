@@ -1,6 +1,6 @@
 // ============================================================
 //  Diario de Estudio - versión simple
-//  Guarda las sesiones en localStorage y calcula la racha.
+//  Guarda las sesiones en localStorage, calcula la racha y pinta el calendario.
 // ============================================================
 
 // Clave con la que guardamos las sesiones en el navegador.
@@ -8,6 +8,13 @@ const CLAVE = "diario-estudio-sesiones";
 
 // Clave usada por versiones anteriores. Solo sirve para migrar datos.
 const CLAVE_ANTIGUA = "diarioDeEstudio.sesiones";
+
+// Nombres en español para el calendario.
+const MESES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+const DIAS_SEMANA = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
 
 // ------------------------------------------------------------
 //  Utilidades de fecha (siempre en fecha LOCAL del usuario)
@@ -204,6 +211,95 @@ function mostrarSesiones(sesiones) {
 }
 
 // ------------------------------------------------------------
+//  Calendario
+// ------------------------------------------------------------
+
+// Devuelve los meses ("AAAA-MM") con algún registro, del más antiguo al más
+// nuevo. Las fechas futuras no cuentan.
+function mesesConRegistros(sesiones) {
+  const hoy = hoyLocal();
+  const meses = sesiones
+    .map((s) => s.date)
+    .filter((date) => date <= hoy)
+    .map((date) => date.slice(0, 7));
+  return [...new Set(meses)].sort();
+}
+
+// Elige el mes que se muestra al abrir: el actual, acotado al rango de datos.
+function mesInicial(sesiones) {
+  const mesActual = hoyLocal().slice(0, 7);
+  const meses = mesesConRegistros(sesiones);
+
+  if (meses.length === 0) return textoAFecha(`${mesActual}-01`);
+
+  const minMes = meses[0];
+  const maxMes = meses[meses.length - 1];
+
+  let elegido = mesActual;
+  if (mesActual < minMes) elegido = minMes;
+  if (mesActual > maxMes) elegido = maxMes;
+
+  return textoAFecha(`${elegido}-01`);
+}
+
+// Pinta el calendario del mes que se está viendo (variable global mesMostrado).
+function mostrarCalendario(sesiones) {
+  const dias = diasConSesion(sesiones);
+  const hoy = hoyLocal();
+
+  const anio = mesMostrado.getFullYear();
+  const mes = mesMostrado.getMonth();
+  const mesTexto = `${anio}-${String(mes + 1).padStart(2, "0")}`;
+
+  // Título: por ejemplo "octubre 2026".
+  document.getElementById("tituloMes").textContent = `${MESES[mes]} ${anio}`;
+
+  // Límites de navegación: del primer al último mes con registros.
+  const meses = mesesConRegistros(sesiones);
+  const minMes = meses.length ? meses[0] : mesTexto;
+  const maxMes = meses.length ? meses[meses.length - 1] : mesTexto;
+  document.getElementById("mesAnterior").disabled = mesTexto <= minMes;
+  document.getElementById("mesSiguiente").disabled = mesTexto >= maxMes;
+
+  const contenedor = document.getElementById("calendario");
+  contenedor.innerHTML = "";
+
+  // Cabecera con los nombres de los días (la semana empieza en lunes).
+  DIAS_SEMANA.forEach((nombre) => {
+    const celda = document.createElement("div");
+    celda.className = "dia-semana";
+    celda.textContent = nombre;
+    contenedor.appendChild(celda);
+  });
+
+  // Huecos vacíos para que el día 1 caiga en su columna.
+  const primerDia = new Date(anio, mes, 1);
+  const huecos = (primerDia.getDay() + 6) % 7; // 0 = lunes
+  for (let i = 0; i < huecos; i++) {
+    const hueco = document.createElement("div");
+    hueco.className = "dia-vacio";
+    contenedor.appendChild(hueco);
+  }
+
+  // Un cuadro por cada día del mes.
+  const totalDias = new Date(anio, mes + 1, 0).getDate();
+  for (let dia = 1; dia <= totalDias; dia++) {
+    const fechaTexto = fechaALocal(new Date(anio, mes, dia));
+
+    const celda = document.createElement("div");
+    celda.className = "dia";
+    celda.textContent = dia;
+
+    // Se marca si hubo sesión y el día no es futuro.
+    if (fechaTexto <= hoy && dias.has(fechaTexto)) {
+      celda.classList.add("estudiado");
+    }
+
+    contenedor.appendChild(celda);
+  }
+}
+
+// ------------------------------------------------------------
 //  Poner todo en marcha
 // ------------------------------------------------------------
 
@@ -212,27 +308,52 @@ const campoFecha = document.getElementById("fecha");
 const campoTema = document.getElementById("tema");
 const campoMinutos = document.getElementById("minutos");
 const cajaError = document.getElementById("error");
+const cajaNotaFecha = document.getElementById("notaFecha");
 
-// Al cargar la página: fecha de hoy por defecto y pintar datos.
+// El campo de fecha queda fijo en hoy: solo se registra la fecha del equipo.
+campoFecha.readOnly = true;
 campoFecha.value = hoyLocal();
 
+// Si se intenta cambiar la fecha, explicamos por qué no se puede.
+function avisarFechaBloqueada() {
+  cajaNotaFecha.textContent =
+    "Solo puedes registrar la sesión de hoy. Si la fecha de tu equipo es incorrecta, cámbiala en los ajustes del sistema.";
+}
+campoFecha.addEventListener("click", avisarFechaBloqueada);
+campoFecha.addEventListener("focus", avisarFechaBloqueada);
+campoFecha.addEventListener("keydown", (evento) => {
+  evento.preventDefault();
+  avisarFechaBloqueada();
+});
+
+// Al cargar la página pintamos todos los datos.
 let sesiones = leerSesiones();
+let mesMostrado = mesInicial(sesiones);
+
 mostrarRacha(sesiones);
 mostrarSesiones(sesiones);
+mostrarCalendario(sesiones);
+
+// Botones para cambiar de mes en el calendario.
+document.getElementById("mesAnterior").addEventListener("click", () => {
+  mesMostrado = new Date(mesMostrado.getFullYear(), mesMostrado.getMonth() - 1, 1);
+  mostrarCalendario(sesiones);
+});
+document.getElementById("mesSiguiente").addEventListener("click", () => {
+  mesMostrado = new Date(mesMostrado.getFullYear(), mesMostrado.getMonth() + 1, 1);
+  mostrarCalendario(sesiones);
+});
 
 // Al enviar el formulario, validamos y guardamos.
 formulario.addEventListener("submit", (evento) => {
   evento.preventDefault();
 
-  const fecha = campoFecha.value;
+  // La fecha es siempre la de hoy en el equipo.
+  const fecha = hoyLocal();
   const tema = campoTema.value.trim();
   const minutos = Number(campoMinutos.value);
 
   // Validación sencilla con mensajes en español.
-  if (!fecha) {
-    cajaError.textContent = "Elige una fecha.";
-    return;
-  }
   if (!tema) {
     cajaError.textContent = "Escribe el tema de la sesión.";
     return;
@@ -251,6 +372,7 @@ formulario.addEventListener("submit", (evento) => {
   // Refrescamos la pantalla.
   mostrarRacha(sesiones);
   mostrarSesiones(sesiones);
+  mostrarCalendario(sesiones);
 
   // Limpiamos el formulario (la fecha vuelve a hoy).
   formulario.reset();

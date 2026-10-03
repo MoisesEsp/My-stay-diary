@@ -25,6 +25,13 @@ pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Mejor racha = la secuencia más larga de días consecutivos con al menos 1 sesión en todo
   el historial. No usa la regla de "ayer sigue viva" (eso es solo para la racha actual).
   Excluye las fechas futuras e incluye la racha actual cuando es la más larga.
+- El formulario solo registra la fecha actual del equipo: el campo de fecha está bloqueado
+  (readonly) y al pulsarlo se muestra un aviso. No se permiten registros pasados ni futuros.
+## Calendario
+- Muestra el mes que se está viendo, con la semana empezando en lunes.
+- Marca los días con al menos 1 sesión (fecha local) y excluye las fechas futuras.
+- La navegación va del mes del primer registro al del último, sin pasar del mes actual; los
+  meses intermedios sin datos se muestran vacíos y los botones se desactivan en los extremos.
 ## Forma de trabajar
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
 - Cambios pequeños y enfocados; no reescribas lo que ya funciona.

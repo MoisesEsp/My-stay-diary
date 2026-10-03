@@ -32,7 +32,8 @@
       <form id="formulario" novalidate>
         <div class="campo">
           <label for="fecha">Fecha</label>
-          <input type="date" id="fecha" name="fecha" required />
+          <input type="date" id="fecha" name="fecha" readonly />
+          <p class="nota" id="notaFecha"></p>
         </div>
 
         <div class="campo">
@@ -56,6 +57,16 @@
       <h2>Mis sesiones</h2>
       <ul class="lista-sesiones" id="listaSesiones"></ul>
       <p class="vacio" id="mensajeVacio">Todavía no hay sesiones. ¡Empieza hoy!</p>
+    </section>
+
+    <!-- Calendario del mes -->
+    <section class="tarjeta">
+      <div class="calendario-cabecera">
+        <button type="button" id="mesAnterior" class="boton-mes" aria-label="Mes anterior">&lsaquo;</button>
+        <h2 id="tituloMes">—</h2>
+        <button type="button" id="mesSiguiente" class="boton-mes" aria-label="Mes siguiente">&rsaquo;</button>
+      </div>
+      <div class="calendario" id="calendario"></div>
     </section>
   </main>
 
