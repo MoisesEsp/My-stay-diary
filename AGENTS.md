@@ -22,6 +22,9 @@ Date("AAAA-MM-DD")`: se interpretan en UTC y desplazan el día.
 - Racha = días consecutivos con al menos 1 sesión que terminan hoy. Si hoy no hay sesión
 pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Varias sesiones el mismo día cuentan como un solo día. Las fechas futuras no suman.
+- Mejor racha = la secuencia más larga de días consecutivos con al menos 1 sesión en todo
+  el historial. No usa la regla de "ayer sigue viva" (eso es solo para la racha actual).
+  Excluye las fechas futuras e incluye la racha actual cuando es la más larga.
 ## Forma de trabajar
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
 - Cambios pequeños y enfocados; no reescribas lo que ya funciona.
@@ -46,3 +49,4 @@ dejarlo en la memoria.
 - No hay tests ni lint. Probar abriendo `index.html` en el navegador.
 - Para empezar de cero: DevTools → Application → Local Storage → borrar la clave
 `diario-estudio-sesiones`.
+

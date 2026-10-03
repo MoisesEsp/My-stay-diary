@@ -82,24 +82,28 @@ function guardarSesiones(sesiones) {
 //  Racha
 // ------------------------------------------------------------
 
+// Devuelve un conjunto (Set) con los días que tienen al menos una sesión.
+// Varias sesiones el mismo día cuentan como un solo día.
+function diasConSesion(sesiones) {
+  return new Set(sesiones.map((s) => s.date));
+}
+
 // Calcula los días seguidos estudiando que terminan hoy.
-// Un día cuenta si tiene al menos una sesión.
 // Si hoy aún no hay sesión pero ayer sí, la racha sigue viva.
 function calcularRacha(sesiones) {
-  // Creamos un conjunto con los días que tienen sesión.
-  const diasConSesion = new Set(sesiones.map((s) => s.date));
+  const dias = diasConSesion(sesiones);
 
   // Empezamos desde hoy.
   let cursor = textoAFecha(hoyLocal());
 
   // Si hoy no hay sesión, probamos desde ayer (la racha aún no se rompe).
-  if (!diasConSesion.has(fechaALocal(cursor))) {
+  if (!dias.has(fechaALocal(cursor))) {
     cursor.setDate(cursor.getDate() - 1);
   }
 
   // Contamos hacia atrás mientras haya días con sesión.
   let racha = 0;
-  while (diasConSesion.has(fechaALocal(cursor))) {
+  while (dias.has(fechaALocal(cursor))) {
     racha++;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -107,13 +111,49 @@ function calcularRacha(sesiones) {
   return racha;
 }
 
+// Calcula la mejor racha: la secuencia más larga de días consecutivos con
+// al menos una sesión en todo el historial.
+// No usa la regla de "ayer sigue viva" (esa es solo para la racha actual).
+// Las fechas futuras no cuentan.
+function calcularMejorRacha(sesiones) {
+  const hoy = hoyLocal();
+
+  // Días con sesión, sin futuros y ordenados del más antiguo al más nuevo.
+  // El formato "AAAA-MM-DD" ya ordena bien como texto.
+  const dias = [...diasConSesion(sesiones)]
+    .filter((dia) => dia <= hoy)
+    .sort();
+
+  let mejor = 0; // la racha más larga encontrada
+  let actual = 0; // la racha que estamos contando ahora
+  let anterior = null;
+
+  dias.forEach((dia) => {
+    // ¿Este día es justo el siguiente al anterior?
+    let esSiguiente = false;
+    if (anterior !== null) {
+      const fechaAnterior = textoAFecha(anterior);
+      fechaAnterior.setDate(fechaAnterior.getDate() + 1);
+      esSiguiente = fechaALocal(fechaAnterior) === dia;
+    }
+
+    // Si es consecutivo, la racha crece; si no, empieza de nuevo en 1.
+    actual = esSiguiente ? actual + 1 : 1;
+    if (actual > mejor) mejor = actual;
+    anterior = dia;
+  });
+
+  return mejor;
+}
+
 // ------------------------------------------------------------
 //  Dibujar en pantalla
 // ------------------------------------------------------------
 
-// Muestra el número de la racha.
+// Muestra los números de la racha actual y de la mejor racha.
 function mostrarRacha(sesiones) {
   document.getElementById("rachaNumero").textContent = calcularRacha(sesiones);
+  document.getElementById("mejorRachaNumero").textContent = calcularMejorRacha(sesiones);
 }
 
 // Muestra la lista de sesiones, de la más reciente a la más antigua.

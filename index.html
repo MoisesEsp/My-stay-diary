@@ -14,10 +14,16 @@
       <p class="subtitulo">Registra tus sesiones y cuida tu racha</p>
     </header>
 
-    <!-- Racha actual -->
+    <!-- Racha actual y mejor racha -->
     <section class="tarjeta racha">
-      <span class="racha-numero" id="rachaNumero">0</span>
-      <span class="racha-texto">días seguidos estudiando</span>
+      <div class="racha-bloque">
+        <span class="racha-numero" id="rachaNumero">0</span>
+        <span class="racha-texto">racha actual</span>
+      </div>
+      <div class="racha-bloque">
+        <span class="racha-numero" id="mejorRachaNumero">0</span>
+        <span class="racha-texto">mejor racha</span>
+      </div>
     </section>
 
     <!-- Formulario para registrar una sesión -->
@@ -51,7 +57,6 @@
       <ul class="lista-sesiones" id="listaSesiones"></ul>
       <p class="vacio" id="mensajeVacio">Todavía no hay sesiones. ¡Empieza hoy!</p>
     </section>
-
   </main>
 
   <script src="app.js"></script>
