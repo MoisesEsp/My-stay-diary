@@ -26,6 +26,8 @@ pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
 - Cambios pequeños y enfocados; no reescribas lo que ya funciona.
 - Al terminar, resume qué has cambiado y cualquier decisión que deba revisar.
+- Antes de hacer commit o push, muestra siempre el mensaje de commit propuesto y
+  espera el OK del usuario. No hagas commit ni push sin su aprobación explícita.
 ## Límites
 - ✅ Siempre: respetar las reglas de fechas y racha, mantener los textos en español.
 - ⚠️ Pregunta antes: crear archivos nuevos, cambiar el formato de los datos guardados.
