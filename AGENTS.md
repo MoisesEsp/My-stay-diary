@@ -28,8 +28,18 @@ pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Al terminar, resume qué has cambiado y cualquier decisión que deba revisar.
 - Antes de hacer commit o push, muestra siempre el mensaje de commit propuesto y
   espera el OK del usuario. No hagas commit ni push sin su aprobación explícita.
+## Memoria
+- Al empezar, lee `MEMORY.md` para conocer el estado del proyecto y las decisiones
+tomadas.
+- Al terminar una tarea, actualízalo: estado actual, decisiones importantes (con su
+porqué) y errores a evitar.
+- Mantenlo breve (máximo ~50 líneas): resume o elimina lo que ya no aporte.
+- Si algo se convierte en una regla permanente, propón moverlo a `AGENTS.md` en lugar de
+dejarlo en la memoria.
+- No guardes nunca datos sensibles (claves, tokens, datos personales)
 ## Límites
 - ✅ Siempre: respetar las reglas de fechas y racha, mantener los textos en español.
+- ✅ Siempre: actualizar `MEMORY.md` al terminar cada tarea.
 - ⚠️ Pregunta antes: crear archivos nuevos, cambiar el formato de los datos guardados.
 - 🚫 Nunca: añadir dependencias, frameworks o un paso de build.
 ## Verificación
