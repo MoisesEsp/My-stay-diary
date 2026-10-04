@@ -276,6 +276,94 @@ button:hover {
   font-weight: 700;
 }
 
+/* ---------- Temporizador de sesión ---------- */
+.temporizador-caja {
+  text-align: center;
+  margin: 4px 0 16px;
+}
+
+.temporizador {
+  margin: 0;
+  font-size: 2.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--principal);
+}
+
+.controles-sesion {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.controles-sesion button {
+  width: auto;
+  flex: 1;
+}
+
+.boton-secundario {
+  background-color: var(--fondo);
+  color: var(--texto);
+}
+
+.boton-secundario:hover {
+  background-color: var(--borde);
+}
+
+.boton-peligro {
+  background-color: var(--error);
+}
+
+.boton-peligro:hover {
+  background-color: #b91c1c;
+}
+
+.mensaje-fin {
+  margin: 12px 0 0;
+  text-align: center;
+  font-weight: 600;
+  color: var(--principal);
+}
+
+/* ---------- Modal ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: rgba(17, 24, 39, 0.5);
+}
+
+.modal-contenido {
+  width: 100%;
+  max-width: 380px;
+  padding: 20px;
+  background-color: var(--tarjeta);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-contenido p {
+  margin: 0 0 16px;
+}
+
+.modal-botones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Estos elementos usan .oculto, así que necesita ganar a su display propio */
+.temporizador-caja.oculto,
+.controles-sesion.oculto,
+.mensaje-fin.oculto,
+.modal.oculto {
+  display: none;
+}
+
 /* ---------- Móvil ---------- */
 @media (max-width: 480px) {
   .racha-numero {
@@ -300,5 +388,9 @@ button:hover {
 
   .calendario .dia {
     font-size: 0.8rem;
+  }
+
+  .temporizador {
+    font-size: 2.1rem;
   }
 }

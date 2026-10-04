@@ -300,6 +300,212 @@ function mostrarCalendario(sesiones) {
 }
 
 // ------------------------------------------------------------
+//  Temporizador de sesión
+// ------------------------------------------------------------
+
+// Si al cancelar no se llega a estos minutos, no se guarda la sesión.
+const MINIMOS_PARA_GUARDAR = 8;
+
+// Estado de la sesión en marcha.
+let estadoSesion = "idle"; // "idle" | "corriendo" | "pausado"
+let estadoAntesCancelar = "idle";
+let minutosOriginal = 0;
+let segundosRestantes = 0;
+let intervaloSesion = null;
+let temaActual = "";
+
+// Convierte segundos en texto "MM:SS".
+function formatearTiempo(segundos) {
+  const min = Math.floor(segundos / 60);
+  const seg = segundos % 60;
+  return `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
+}
+
+// Muestra el tiempo que queda.
+function actualizarTemporizador() {
+  textoTemporizador.textContent = formatearTiempo(segundosRestantes);
+}
+
+// Bloquea o desbloquea el tema y los minutos mientras dura la sesión.
+function bloquearCampos(bloqueado) {
+  campoTema.disabled = bloqueado;
+  campoMinutos.disabled = bloqueado;
+}
+
+// Reproduce un sonido breve de cañón con la Web Audio API (sin archivos).
+function reproducirSonidoCanon() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  const ctx = new AudioCtx();
+  const ahora = ctx.currentTime;
+  const duracion = 0.6;
+
+  // "Boom": un tono grave que baja y se apaga rápido.
+  const osc = ctx.createOscillator();
+  const volumen = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(140, ahora);
+  osc.frequency.exponentialRampToValueAtTime(40, ahora + duracion);
+  volumen.gain.setValueAtTime(0.9, ahora);
+  volumen.gain.exponentialRampToValueAtTime(0.001, ahora + duracion);
+  osc.connect(volumen);
+  volumen.connect(ctx.destination);
+  osc.start(ahora);
+  osc.stop(ahora + duracion);
+
+  // "Crack" inicial: un ruido muy corto.
+  const muestras = Math.floor(ctx.sampleRate * 0.15);
+  const buffer = ctx.createBuffer(1, muestras, ctx.sampleRate);
+  const datos = buffer.getChannelData(0);
+  for (let i = 0; i < muestras; i++) {
+    datos[i] = (Math.random() * 2 - 1) * (1 - i / muestras);
+  }
+  const ruido = ctx.createBufferSource();
+  const volumenRuido = ctx.createGain();
+  ruido.buffer = buffer;
+  volumenRuido.gain.setValueAtTime(0.5, ahora);
+  volumenRuido.gain.exponentialRampToValueAtTime(0.001, ahora + 0.15);
+  ruido.connect(volumenRuido);
+  volumenRuido.connect(ctx.destination);
+  ruido.start(ahora);
+
+  // Cerramos el contexto al terminar para liberar recursos.
+  osc.onended = () => ctx.close();
+}
+
+// Guarda la sesión con los minutos indicados y refresca la pantalla.
+function guardarSesion(minutos) {
+  sesiones.push({ date: hoyLocal(), topic: temaActual, minutes: minutos });
+  guardarSesiones(sesiones);
+  mostrarRacha(sesiones);
+  mostrarSesiones(sesiones);
+  mostrarCalendario(sesiones);
+}
+
+// Deja el formulario listo para una sesión nueva.
+function reiniciarInterfazSesion() {
+  clearInterval(intervaloSesion);
+  intervaloSesion = null;
+  estadoSesion = "idle";
+
+  bloquearCampos(false);
+  botonAccion.classList.remove("oculto");
+  cajaTemporizador.classList.add("oculto");
+  controlesSesion.classList.add("oculto");
+  botonPausarReanudar.textContent = "Pausar sesión";
+
+  formulario.reset();
+  campoFecha.value = hoyLocal();
+  campoTema.focus();
+}
+
+// Empieza la cuenta atrás.
+function iniciarSesion(tema, minutos) {
+  temaActual = tema;
+  minutosOriginal = minutos;
+  segundosRestantes = minutos * 60;
+  estadoSesion = "corriendo";
+
+  bloquearCampos(true);
+  botonAccion.classList.add("oculto");
+  cajaTemporizador.classList.remove("oculto");
+  controlesSesion.classList.remove("oculto");
+  cajaMensajeFin.classList.add("oculto");
+  botonPausarReanudar.textContent = "Pausar sesión";
+  actualizarTemporizador();
+
+  intervaloSesion = setInterval(ticSesion, 1000);
+}
+
+// Cada segundo baja el tiempo restante.
+function ticSesion() {
+  segundosRestantes--;
+  if (segundosRestantes <= 0) {
+    segundosRestantes = 0;
+    actualizarTemporizador();
+    finalizarSesion();
+    return;
+  }
+  actualizarTemporizador();
+}
+
+// Pausa o reanuda la cuenta atrás (un solo botón).
+function alternarPausarReanudar() {
+  if (estadoSesion === "corriendo") {
+    clearInterval(intervaloSesion);
+    intervaloSesion = null;
+    estadoSesion = "pausado";
+    botonPausarReanudar.textContent = "Reanudar sesión";
+  } else if (estadoSesion === "pausado") {
+    estadoSesion = "corriendo";
+    intervaloSesion = setInterval(ticSesion, 1000);
+    botonPausarReanudar.textContent = "Pausar sesión";
+  }
+}
+
+// Se agotó el tiempo: guardamos la sesión completa.
+function finalizarSesion() {
+  reiniciarInterfazSesion();
+  guardarSesion(minutosOriginal);
+  cajaMensajeFin.textContent = "¡Tiempo terminado! Sesión guardada.";
+  cajaMensajeFin.classList.remove("oculto");
+  reproducirSonidoCanon();
+}
+
+// El usuario pulsa "Cancelar sesión".
+function cancelarSesion() {
+  // Guardamos si estaba corriendo o pausado para poder continuar después.
+  estadoAntesCancelar = estadoSesion;
+
+  // Pausamos la cuenta atrás mientras se decide.
+  if (estadoSesion === "corriendo") {
+    clearInterval(intervaloSesion);
+    intervaloSesion = null;
+  }
+
+  const segundosRealizados = minutosOriginal * 60 - segundosRestantes;
+  const minutosRealizados = Math.floor(segundosRealizados / 60);
+
+  // Si llega al mínimo, se guarda directamente con el tiempo realizado.
+  if (minutosRealizados >= MINIMOS_PARA_GUARDAR) {
+    reiniciarInterfazSesion();
+    guardarSesion(minutosRealizados);
+    cajaMensajeFin.textContent = `Sesión guardada: ${minutosRealizados} min.`;
+    cajaMensajeFin.classList.remove("oculto");
+    return;
+  }
+
+  // Si no llega, preguntamos antes de descartarla.
+  estadoSesion = "pausado";
+  modalTexto.textContent =
+    `Has estudiado ${minutosRealizados} minuto(s). Como no llegas a ` +
+    `${MINIMOS_PARA_GUARDAR} minutos, si cancelas la sesión no se guardará. ` +
+    "¿Qué quieres hacer?";
+  modalCancelar.classList.remove("oculto");
+}
+
+// El usuario decide seguir con la sesión.
+function continuarSesion() {
+  modalCancelar.classList.add("oculto");
+
+  if (estadoAntesCancelar === "corriendo") {
+    estadoSesion = "corriendo";
+    intervaloSesion = setInterval(ticSesion, 1000);
+    botonPausarReanudar.textContent = "Pausar sesión";
+  } else {
+    estadoSesion = "pausado";
+    botonPausarReanudar.textContent = "Reanudar sesión";
+  }
+}
+
+// El usuario confirma que cancela: no se guarda nada.
+function cancelarDefinitivo() {
+  modalCancelar.classList.add("oculto");
+  reiniciarInterfazSesion();
+}
+
+// ------------------------------------------------------------
 //  Poner todo en marcha
 // ------------------------------------------------------------
 
@@ -309,6 +515,19 @@ const campoTema = document.getElementById("tema");
 const campoMinutos = document.getElementById("minutos");
 const cajaError = document.getElementById("error");
 const cajaNotaFecha = document.getElementById("notaFecha");
+
+// Referencias del temporizador.
+const cajaTemporizador = document.getElementById("temporizadorCaja");
+const textoTemporizador = document.getElementById("temporizador");
+const controlesSesion = document.getElementById("controlesSesion");
+const botonAccion = document.getElementById("botonAccion");
+const botonPausarReanudar = document.getElementById("botonPausarReanudar");
+const botonCancelar = document.getElementById("botonCancelar");
+const cajaMensajeFin = document.getElementById("mensajeFin");
+const modalCancelar = document.getElementById("modalCancelar");
+const modalTexto = document.getElementById("modalTexto");
+const modalContinuar = document.getElementById("modalContinuar");
+const modalCancelarDefinitivo = document.getElementById("modalCancelarDefinitivo");
 
 // El campo de fecha queda fijo en hoy: solo se registra la fecha del equipo.
 campoFecha.readOnly = true;
@@ -344,12 +563,26 @@ document.getElementById("mesSiguiente").addEventListener("click", () => {
   mostrarCalendario(sesiones);
 });
 
-// Al enviar el formulario, validamos y guardamos.
+// Controles del temporizador.
+botonPausarReanudar.addEventListener("click", alternarPausarReanudar);
+botonCancelar.addEventListener("click", cancelarSesion);
+modalContinuar.addEventListener("click", continuarSesion);
+modalCancelarDefinitivo.addEventListener("click", cancelarDefinitivo);
+
+// Escape equivale a "continuar la sesión".
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape" && !modalCancelar.classList.contains("oculto")) {
+    continuarSesion();
+  }
+});
+
+// Al enviar el formulario, validamos e iniciamos el temporizador.
 formulario.addEventListener("submit", (evento) => {
   evento.preventDefault();
 
-  // La fecha es siempre la de hoy en el equipo.
-  const fecha = hoyLocal();
+  // Si ya hay una sesión en marcha, no hacemos nada.
+  if (estadoSesion !== "idle") return;
+
   const tema = campoTema.value.trim();
   const minutos = Number(campoMinutos.value);
 
@@ -364,18 +597,6 @@ formulario.addEventListener("submit", (evento) => {
   }
 
   cajaError.textContent = "";
-
-  // Añadimos la nueva sesión y guardamos.
-  sesiones.push({ date: fecha, topic: tema, minutes: minutos });
-  guardarSesiones(sesiones);
-
-  // Refrescamos la pantalla.
-  mostrarRacha(sesiones);
-  mostrarSesiones(sesiones);
-  mostrarCalendario(sesiones);
-
-  // Limpiamos el formulario (la fecha vuelve a hoy).
-  formulario.reset();
-  campoFecha.value = hoyLocal();
-  campoTema.focus();
+  cajaMensajeFin.classList.add("oculto");
+  iniciarSesion(tema, minutos);
 });

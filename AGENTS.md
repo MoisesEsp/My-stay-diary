@@ -32,6 +32,17 @@ pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Marca los días con al menos 1 sesión (fecha local) y excluye las fechas futuras.
 - La navegación va del mes del primer registro al del último, sin pasar del mes actual; los
   meses intermedios sin datos se muestran vacíos y los botones se desactivan en los extremos.
+## Temporizador de sesión
+- El botón del formulario es "Iniciar sesión": al pulsarlo arranca una cuenta atrás (MM:SS)
+  con los minutos indicados. Mientras corre, ese botón se oculta y aparecen un único botón
+  Pausar/Reanudar y otro Cancelar. Tema y minutos quedan bloqueados durante la sesión.
+- Al terminar la cuenta atrás se guarda la sesión con los minutos completos, se muestra
+  "¡Tiempo terminado!" y suena un breve sonido de cañón (Web Audio, sin archivos externos).
+- Al cancelar se guarda el tiempo realizado = minutos originales - minutos restantes,
+  redondeando hacia abajo (floor). Si el tiempo realizado NO llega a 8 minutos, la cuenta se
+  pausa y se pide confirmación: "Continuar la sesión" o "Cancelar la sesión definitivamente"
+  (en este último caso no se guarda nada). Una sesión de menos de 8 minutos nunca se guarda.
+- El estado del temporizador no persiste al recargar la página.
 ## Forma de trabajar
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
 - Cambios pequeños y enfocados; no reescribas lo que ya funciona.

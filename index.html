@@ -48,7 +48,19 @@
 
         <p class="error" id="error"></p>
 
-        <button type="submit">Guardar sesión</button>
+        <!-- Temporizador y controles de la sesión -->
+        <div class="temporizador-caja oculto" id="temporizadorCaja">
+          <p class="temporizador" id="temporizador">00:00</p>
+        </div>
+
+        <button type="submit" id="botonAccion">Iniciar sesión</button>
+
+        <div class="controles-sesion oculto" id="controlesSesion">
+          <button type="button" id="botonPausarReanudar" class="boton-secundario">Pausar sesión</button>
+          <button type="button" id="botonCancelar" class="boton-peligro">Cancelar sesión</button>
+        </div>
+
+        <p class="mensaje-fin oculto" id="mensajeFin"></p>
       </form>
     </section>
 
@@ -69,6 +81,17 @@
       <div class="calendario" id="calendario"></div>
     </section>
   </main>
+
+  <!-- Modal para confirmar la cancelación si no se llega al mínimo -->
+  <div class="modal oculto" id="modalCancelar">
+    <div class="modal-contenido">
+      <p id="modalTexto"></p>
+      <div class="modal-botones">
+        <button type="button" id="modalContinuar" class="boton-secundario">Continuar la sesión</button>
+        <button type="button" id="modalCancelarDefinitivo" class="boton-peligro">Cancelar la sesión definitivamente</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
