@@ -11,6 +11,9 @@ programar.
 - Textos de la interfaz en español.
 - Código simple, nombres descriptivos y comentarios solo donde aporten.
 - Diseño limpio y responsive; cualquier pantalla nueva debe verse bien en el móvil.
+- Estilo "cuaderno de estudio": papel cuadriculado, tinta verde y subrayador amarillo;
+  serif para títulos y números, sans para la interfaz y mono para fechas y cronómetro.
+  Sin fuentes externas ni imágenes, para que siga funcionando con doble clic.
 ## Datos
 - localStorage, clave `diario-estudio-sesiones`: array de `{ date: "AAAA-MM-DD", topic,
 minutes }`.
@@ -25,6 +28,9 @@ pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Total semanal = suma de `minutes` de las sesiones con fecha local entre el lunes de la
   semana actual y hoy. La semana empieza en lunes; varias sesiones el mismo día se suman y
   las fechas futuras no cuentan.
+- Días del mes = días distintos con al menos 1 sesión con fecha local dentro del mes natural
+  actual, del día 1 a hoy. Varias sesiones el mismo día cuentan una vez y las fechas futuras
+  no cuentan. No sigue la navegación del calendario: siempre es el mes actual.
 - Mejor racha = la secuencia más larga de días consecutivos con al menos 1 sesión en todo
   el historial. No usa la regla de "ayer sigue viva" (eso es solo para la racha actual).
   Excluye las fechas futuras e incluye la racha actual cuando es la más larga.
@@ -50,8 +56,9 @@ pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Haz solo lo que se pide: no añadas funcionalidades por tu cuenta.
 - Cambios pequeños y enfocados; no reescribas lo que ya funciona.
 - Al terminar, resume qué has cambiado y cualquier decisión que deba revisar.
-- Antes de hacer commit o push, muestra siempre el mensaje de commit propuesto y
-  espera el OK del usuario. No hagas commit ni push sin su aprobación explícita.
+- Antes de hacer commit o push, muestra siempre el mensaje de commit propuesto y pide
+  permiso con la pregunta «¿Me das el OK para ejecutarlo?». No hagas commit ni push sin su
+  aprobación explícita.
 ## Memoria
 - Al empezar, lee `MEMORY.md` para conocer el estado del proyecto y las decisiones
 tomadas.

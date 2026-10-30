@@ -175,6 +175,20 @@ function calcularMinutosSemana(sesiones) {
 }
 
 // ------------------------------------------------------------
+//  Días estudiados en el mes actual
+// ------------------------------------------------------------
+
+// Cuenta los días distintos con sesión en el mes actual (del día 1 a hoy).
+function calcularDiasMes(sesiones) {
+  const hoy = hoyLocal();
+  const prefijoMes = hoy.slice(0, 7); // "AAAA-MM"
+
+  return [...diasConSesion(sesiones)]
+    .filter((dia) => dia.startsWith(prefijoMes) && dia <= hoy)
+    .length;
+}
+
+// ------------------------------------------------------------
 //  Dibujar en pantalla
 // ------------------------------------------------------------
 
@@ -187,6 +201,11 @@ function mostrarRacha(sesiones) {
 // Muestra el total de minutos estudiados esta semana.
 function mostrarMinutosSemana(sesiones) {
   document.getElementById("minutosSemana").textContent = calcularMinutosSemana(sesiones);
+}
+
+// Muestra los días distintos estudiados en el mes actual.
+function mostrarDiasMes(sesiones) {
+  document.getElementById("diasMes").textContent = calcularDiasMes(sesiones);
 }
 
 // Muestra la lista de sesiones, de la más reciente a la más antigua.
@@ -406,6 +425,7 @@ function guardarSesion(minutos) {
   guardarSesiones(sesiones);
   mostrarRacha(sesiones);
   mostrarMinutosSemana(sesiones);
+  mostrarDiasMes(sesiones);
   mostrarSesiones(sesiones);
   mostrarCalendario(sesiones);
 }
@@ -578,6 +598,7 @@ let mesMostrado = mesInicial(sesiones);
 
 mostrarRacha(sesiones);
 mostrarMinutosSemana(sesiones);
+mostrarDiasMes(sesiones);
 mostrarSesiones(sesiones);
 mostrarCalendario(sesiones);
 
