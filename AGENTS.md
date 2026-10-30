@@ -22,6 +22,9 @@ Date("AAAA-MM-DD")`: se interpretan en UTC y desplazan el día.
 - Racha = días consecutivos con al menos 1 sesión que terminan hoy. Si hoy no hay sesión
 pero ayer sí, la racha sigue viva y se cuenta desde ayer.
 - Varias sesiones el mismo día cuentan como un solo día. Las fechas futuras no suman.
+- Total semanal = suma de `minutes` de las sesiones con fecha local entre el lunes de la
+  semana actual y hoy. La semana empieza en lunes; varias sesiones el mismo día se suman y
+  las fechas futuras no cuentan.
 - Mejor racha = la secuencia más larga de días consecutivos con al menos 1 sesión en todo
   el historial. No usa la regla de "ayer sigue viva" (eso es solo para la racha actual).
   Excluye las fechas futuras e incluye la racha actual cuando es la más larga.

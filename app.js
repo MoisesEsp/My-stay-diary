@@ -154,6 +154,27 @@ function calcularMejorRacha(sesiones) {
 }
 
 // ------------------------------------------------------------
+//  Total de minutos de la semana
+// ------------------------------------------------------------
+
+// Devuelve el lunes de la semana actual como "AAAA-MM-DD" (fecha local).
+function inicioSemana() {
+  const hoy = new Date();
+  const offset = (hoy.getDay() + 6) % 7; // lunes = 0
+  hoy.setDate(hoy.getDate() - offset);
+  return fechaALocal(hoy);
+}
+
+// Suma los minutos de las sesiones de esta semana (del lunes a hoy).
+function calcularMinutosSemana(sesiones) {
+  const inicio = inicioSemana();
+  const hoy = hoyLocal();
+  return sesiones
+    .filter((s) => s.date >= inicio && s.date <= hoy)
+    .reduce((total, s) => total + s.minutes, 0);
+}
+
+// ------------------------------------------------------------
 //  Dibujar en pantalla
 // ------------------------------------------------------------
 
@@ -161,6 +182,11 @@ function calcularMejorRacha(sesiones) {
 function mostrarRacha(sesiones) {
   document.getElementById("rachaNumero").textContent = calcularRacha(sesiones);
   document.getElementById("mejorRachaNumero").textContent = calcularMejorRacha(sesiones);
+}
+
+// Muestra el total de minutos estudiados esta semana.
+function mostrarMinutosSemana(sesiones) {
+  document.getElementById("minutosSemana").textContent = calcularMinutosSemana(sesiones);
 }
 
 // Muestra la lista de sesiones, de la más reciente a la más antigua.
@@ -379,6 +405,7 @@ function guardarSesion(minutos) {
   sesiones.push({ date: hoyLocal(), topic: temaActual, minutes: minutos });
   guardarSesiones(sesiones);
   mostrarRacha(sesiones);
+  mostrarMinutosSemana(sesiones);
   mostrarSesiones(sesiones);
   mostrarCalendario(sesiones);
 }
@@ -550,6 +577,7 @@ let sesiones = leerSesiones();
 let mesMostrado = mesInicial(sesiones);
 
 mostrarRacha(sesiones);
+mostrarMinutosSemana(sesiones);
 mostrarSesiones(sesiones);
 mostrarCalendario(sesiones);
 

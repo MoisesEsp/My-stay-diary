@@ -3,7 +3,7 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 aporte.
 ## Estado actual
 - v1 funcionando: registrar sesiones (fecha, tema, minutos), racha actual, mejor racha,
-lista de sesiones y calendario del mes. Modo temporizador con cuenta atrás.
+total de minutos de la semana, lista de sesiones y calendario del mes. Modo temporizador.
 - Datos en localStorage.
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic.
@@ -16,6 +16,8 @@ pide confirmación y, si se cancela, no se guarda. Un solo botón Pausar/Reanuda
 cañón sintetizado con Web Audio (sin archivos). No persiste al recargar.
 - Mejor racha = secuencia consecutiva más larga del historial; excluye fechas futuras e
 incluye la racha actual cuando es la mayor.
+- Total semanal: suma de minutos entre el lunes y hoy (semana natural, fecha local); varias
+sesiones el mismo día se suman y los futuros no cuentan. No se persiste nada nuevo.
 ## Aprendizajes y errores a evitar
 - (vacío por ahora)
 ## Próximos pasos
