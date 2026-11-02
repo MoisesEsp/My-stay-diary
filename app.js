@@ -205,7 +205,10 @@ function mostrarMinutosSemana(sesiones) {
 
 // Muestra los días distintos estudiados en el mes actual.
 function mostrarDiasMes(sesiones) {
-  document.getElementById("diasMes").textContent = calcularDiasMes(sesiones);
+  const dias = calcularDiasMes(sesiones);
+  document.getElementById("diasMes").textContent = dias;
+  document.getElementById("diasMesTexto").textContent =
+    dias === 1 ? "día este mes" : "días este mes";
 }
 
 // Muestra la lista de sesiones, de la más reciente a la más antigua.

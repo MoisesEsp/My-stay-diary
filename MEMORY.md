@@ -27,7 +27,17 @@ para títulos y números, sans para la interfaz y mono para fechas y cronómetro
 externas ni imágenes, para que siga funcionando con doble clic.
 - El repo versiona `.agents/`, `.opencode/` y `skills-lock.json` como muestra del flujo de
 trabajo con IA. No forman parte de la web ni deben afectar al doble clic.
+- Chrome DevTools MCP en `opencode.json` (paquete `@async23/...`) conecta con un Chromium
+que escuche CDP en `127.0.0.1:9222`; sin ese navegador las herramientas fallan. Snapshot y
+captura de viewport funcionan; la captura a página completa puede agotar el tiempo.
 ## Aprendizajes y errores a evitar
+- OpenCode V2 exige `mcp.servers` con `type: "local"` y `command` como array. El formato
+`mcpServers` de Claude Desktop no se lee.
+- En este equipo el navegador está en `/usr/bin/chromium` y el puerto 9222 responde con
+HeadlessChrome; se puede lanzar con `chromium --remote-debugging-port=9222`.
+- Probado con Chrome DevTools MCP: 3 sesiones (hoy, ayer y anteayer) → racha 3, mejor racha
+3, 75 min, consola limpia y 375 px sin desbordamiento. Plural «1 día / días este mes»
+corregido y probado con 1 y 3 días.
 - (vacío por ahora)
 ## Próximos pasos
 - (vacío por ahora)
