@@ -33,6 +33,8 @@ captura de viewport funcionan; la captura a página completa puede agotar el tie
 ## Aprendizajes y errores a evitar
 - OpenCode V2 exige `mcp.servers` con `type: "local"` y `command` como array. El formato
 `mcpServers` de Claude Desktop no se lee.
+- Un JSON inválido en `opencode.json` hace que OpenCode descarte el archivo entero y muestre
+«No MCP servers configured»; conviene validarlo con `node -e JSON.parse`.
 - En este equipo el navegador está en `/usr/bin/chromium` y el puerto 9222 responde con
 HeadlessChrome; se puede lanzar con `chromium --remote-debugging-port=9222`.
 - Probado con Chrome DevTools MCP: 3 sesiones (hoy, ayer y anteayer) → racha 3, mejor racha
