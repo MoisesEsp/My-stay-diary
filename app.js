@@ -1,654 +1,649 @@
 // ============================================================
-//  Diario de Estudio - versión simple
-//  Guarda las sesiones en localStorage, calcula la racha y pinta el calendario.
+//  Diario de Estudio - simple version
+//  Stores sessions in localStorage, calculates streaks and renders the calendar.
+//  Code identifiers and comments are in English; user-facing texts stay in Spanish.
 // ============================================================
 
-// Clave con la que guardamos las sesiones en el navegador.
-const CLAVE = "diario-estudio-sesiones";
+// Key used to store sessions in the browser.
+const STORAGE_KEY = "diario-estudio-sesiones";
 
-// Clave usada por versiones anteriores. Solo sirve para migrar datos.
-const CLAVE_ANTIGUA = "diarioDeEstudio.sesiones";
+// Key used by older versions. Only needed for migration.
+const LEGACY_STORAGE_KEY = "diarioDeEstudio.sesiones";
 
-// Nombres en español para el calendario.
-const MESES = [
+// Spanish names for the calendar UI.
+const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ];
-const DIAS_SEMANA = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
+const WEEKDAYS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
 
 // ------------------------------------------------------------
-//  Utilidades de fecha (siempre en fecha LOCAL del usuario)
+//  Date helpers (always the user's LOCAL date)
 // ------------------------------------------------------------
 
-// Convierte un objeto Date en texto "YYYY-MM-DD" usando la fecha local.
-// No usamos toISOString() porque esa usa UTC y podría cambiar el día.
-function fechaALocal(date) {
-  const anio = date.getFullYear();
-  const mes = String(date.getMonth() + 1).padStart(2, "0");
-  const dia = String(date.getDate()).padStart(2, "0");
-  return `${anio}-${mes}-${dia}`;
+// Converts a Date object to "YYYY-MM-DD" using the local date.
+// Do not use toISOString(): it uses UTC and may shift the day.
+function dateToLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-// Devuelve la fecha de hoy como "YYYY-MM-DD".
-function hoyLocal() {
-  return fechaALocal(new Date());
+// Returns today's date as "YYYY-MM-DD".
+function todayLocal() {
+  return dateToLocal(new Date());
 }
 
-// Convierte un texto "YYYY-MM-DD" en un Date local (a las 00:00).
-function textoAFecha(texto) {
-  const [anio, mes, dia] = texto.split("-").map(Number);
-  return new Date(anio, mes - 1, dia);
+// Converts a "YYYY-MM-DD" string to a local Date at 00:00.
+function textToDate(text) {
+  const [year, month, day] = text.split("-").map(Number);
+  return new Date(year, month - 1, day);
 }
 
-// Muestra "YYYY-MM-DD" como "DD/MM/YYYY" para leerlo mejor.
-function fechaBonita(texto) {
-  const [anio, mes, dia] = texto.split("-");
-  return `${dia}/${mes}/${anio}`;
+// Shows "YYYY-MM-DD" as "DD/MM/YYYY" for easier reading.
+function prettyDate(text) {
+  const [year, month, day] = text.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 // ------------------------------------------------------------
-//  Guardar y leer las sesiones
+//  Read and write sessions
 // ------------------------------------------------------------
 
-// Lee las sesiones guardadas. Si no hay nada, devuelve una lista vacía.
-function leerSesiones() {
-  const datos = localStorage.getItem(CLAVE);
-  if (datos) {
+// Reads saved sessions. Returns an empty list when there is nothing.
+function readSessions() {
+  const data = localStorage.getItem(STORAGE_KEY);
+  if (data) {
     try {
-      return JSON.parse(datos);
-    } catch (e) {
+      return JSON.parse(data);
+    } catch (error) {
       return [];
     }
   }
 
-  // No hay datos con la clave nueva. Miramos la clave antigua y migramos
-  // las sesiones al formato actual ({ date, topic, minutes }).
-  const antiguos = localStorage.getItem(CLAVE_ANTIGUA);
-  if (!antiguos) return [];
+  // No data under the new key. Check the legacy key and migrate the sessions
+  // to the current shape ({ date, topic, minutes }).
+  const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!legacyData) return [];
 
   try {
-    const sesionesAntiguas = JSON.parse(antiguos);
-    const migradas = sesionesAntiguas.map((s) => ({
-      date: s.date !== undefined ? s.date : s.fecha,
-      topic: s.topic !== undefined ? s.topic : s.tema,
-      minutes: s.minutes !== undefined ? s.minutes : s.minutos,
+    const legacySessions = JSON.parse(legacyData);
+    const migrated = legacySessions.map((session) => ({
+      // Legacy Spanish keys are kept here only for compatibility.
+      date: session.date !== undefined ? session.date : session.fecha,
+      topic: session.topic !== undefined ? session.topic : session.tema,
+      minutes: session.minutes !== undefined ? session.minutes : session.minutos,
     }));
-    guardarSesiones(migradas);
-    return migradas;
-  } catch (e) {
+    saveSessions(migrated);
+    return migrated;
+  } catch (error) {
     return [];
   }
 }
 
-// Guarda la lista completa de sesiones.
-function guardarSesiones(sesiones) {
-  localStorage.setItem(CLAVE, JSON.stringify(sesiones));
+// Saves the full list of sessions.
+function saveSessions(sessions) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
 }
 
 // ------------------------------------------------------------
-//  Racha
+//  Streak
 // ------------------------------------------------------------
 
-// Devuelve un conjunto (Set) con los días que tienen al menos una sesión.
-// Varias sesiones el mismo día cuentan como un solo día.
-function diasConSesion(sesiones) {
-  return new Set(sesiones.map((s) => s.date));
+// Returns a Set with the days that have at least one session.
+// Several sessions on the same day count as a single day.
+function daysWithSession(sessions) {
+  return new Set(sessions.map((session) => session.date));
 }
 
-// Calcula los días seguidos estudiando que terminan hoy.
-// Si hoy aún no hay sesión pero ayer sí, la racha sigue viva.
-function calcularRacha(sesiones) {
-  const dias = diasConSesion(sesiones);
+// Calculates consecutive study days ending today.
+// If there is no session today but there was one yesterday, the streak stays alive.
+function calculateStreak(sessions, today = todayLocal()) {
+  const days = daysWithSession(sessions);
 
-  // Empezamos desde hoy.
-  let cursor = textoAFecha(hoyLocal());
+  // Start from today.
+  let cursor = textToDate(today);
 
-  // Si hoy no hay sesión, probamos desde ayer (la racha aún no se rompe).
-  if (!dias.has(fechaALocal(cursor))) {
+  // If today has no session, try yesterday (the streak is not broken yet).
+  if (!days.has(dateToLocal(cursor))) {
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  // Contamos hacia atrás mientras haya días con sesión.
-  let racha = 0;
-  while (dias.has(fechaALocal(cursor))) {
-    racha++;
+  // Count backwards while days have sessions.
+  let streak = 0;
+  while (days.has(dateToLocal(cursor))) {
+    streak++;
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  return racha;
+  return streak;
 }
 
-// Calcula la mejor racha: la secuencia más larga de días consecutivos con
-// al menos una sesión en todo el historial.
-// No usa la regla de "ayer sigue viva" (esa es solo para la racha actual).
-// Las fechas futuras no cuentan.
-function calcularMejorRacha(sesiones) {
-  const hoy = hoyLocal();
-
-  // Días con sesión, sin futuros y ordenados del más antiguo al más nuevo.
-  // El formato "AAAA-MM-DD" ya ordena bien como texto.
-  const dias = [...diasConSesion(sesiones)]
-    .filter((dia) => dia <= hoy)
+// Calculates the best streak: the longest run of consecutive days with at least
+// one session in the whole history.
+// It does not use the "yesterday stays alive" rule (that is only for the current streak).
+// Future dates do not count.
+function calculateBestStreak(sessions, today = todayLocal()) {
+  // Days with a session, without future dates, sorted oldest to newest.
+  // The "YYYY-MM-DD" format already sorts correctly as text.
+  const days = [...daysWithSession(sessions)]
+    .filter((day) => day <= today)
     .sort();
 
-  let mejor = 0; // la racha más larga encontrada
-  let actual = 0; // la racha que estamos contando ahora
-  let anterior = null;
+  let best = 0; // longest run found
+  let current = 0; // run currently being counted
+  let previous = null;
 
-  dias.forEach((dia) => {
-    // ¿Este día es justo el siguiente al anterior?
-    let esSiguiente = false;
-    if (anterior !== null) {
-      const fechaAnterior = textoAFecha(anterior);
-      fechaAnterior.setDate(fechaAnterior.getDate() + 1);
-      esSiguiente = fechaALocal(fechaAnterior) === dia;
+  days.forEach((day) => {
+    // Is this day exactly the one after the previous one?
+    let isNext = false;
+    if (previous !== null) {
+      const previousDate = textToDate(previous);
+      previousDate.setDate(previousDate.getDate() + 1);
+      isNext = dateToLocal(previousDate) === day;
     }
 
-    // Si es consecutivo, la racha crece; si no, empieza de nuevo en 1.
-    actual = esSiguiente ? actual + 1 : 1;
-    if (actual > mejor) mejor = actual;
-    anterior = dia;
+    // Consecutive days grow the run; anything else starts a new run at 1.
+    current = isNext ? current + 1 : 1;
+    if (current > best) best = current;
+    previous = day;
   });
 
-  return mejor;
+  return best;
 }
 
 // ------------------------------------------------------------
-//  Total de minutos de la semana
+//  Weekly minutes
 // ------------------------------------------------------------
 
-// Devuelve el lunes de la semana actual como "AAAA-MM-DD" (fecha local).
-function inicioSemana() {
-  const hoy = new Date();
-  const offset = (hoy.getDay() + 6) % 7; // lunes = 0
-  hoy.setDate(hoy.getDate() - offset);
-  return fechaALocal(hoy);
+// Returns the Monday of the week containing today as "YYYY-MM-DD" (local date).
+function startOfWeek(today = todayLocal()) {
+  const date = textToDate(today);
+  const offset = (date.getDay() + 6) % 7; // Monday = 0
+  date.setDate(date.getDate() - offset);
+  return dateToLocal(date);
 }
 
-// Suma los minutos de las sesiones de esta semana (del lunes a hoy).
-function calcularMinutosSemana(sesiones) {
-  const inicio = inicioSemana();
-  const hoy = hoyLocal();
-  return sesiones
-    .filter((s) => s.date >= inicio && s.date <= hoy)
-    .reduce((total, s) => total + s.minutes, 0);
+// Adds up the minutes of this week's sessions (Monday through today).
+function calculateWeekMinutes(sessions, today = todayLocal()) {
+  const start = startOfWeek(today);
+  return sessions
+    .filter((session) => session.date >= start && session.date <= today)
+    .reduce((total, session) => total + session.minutes, 0);
 }
 
 // ------------------------------------------------------------
-//  Días estudiados en el mes actual
+//  Days studied this month
 // ------------------------------------------------------------
 
-// Cuenta los días distintos con sesión en el mes actual (del día 1 a hoy).
-function calcularDiasMes(sesiones) {
-  const hoy = hoyLocal();
-  const prefijoMes = hoy.slice(0, 7); // "AAAA-MM"
+// Counts distinct days with a session in the current month (day 1 through today).
+function calculateMonthDays(sessions, today = todayLocal()) {
+  const monthPrefix = today.slice(0, 7); // "YYYY-MM"
 
-  return [...diasConSesion(sesiones)]
-    .filter((dia) => dia.startsWith(prefijoMes) && dia <= hoy)
+  return [...daysWithSession(sessions)]
+    .filter((day) => day.startsWith(monthPrefix) && day <= today)
     .length;
 }
 
 // ------------------------------------------------------------
-//  Dibujar en pantalla
+//  Rendering
 // ------------------------------------------------------------
 
-// Muestra los números de la racha actual y de la mejor racha.
-function mostrarRacha(sesiones) {
-  document.getElementById("rachaNumero").textContent = calcularRacha(sesiones);
-  document.getElementById("mejorRachaNumero").textContent = calcularMejorRacha(sesiones);
+// Shows the current streak and the best streak.
+function renderStreak(sessions) {
+  document.getElementById("rachaNumero").textContent = calculateStreak(sessions);
+  document.getElementById("mejorRachaNumero").textContent = calculateBestStreak(sessions);
 }
 
-// Muestra el total de minutos estudiados esta semana.
-function mostrarMinutosSemana(sesiones) {
-  document.getElementById("minutosSemana").textContent = calcularMinutosSemana(sesiones);
+// Shows the minutes studied this week.
+function renderWeekMinutes(sessions) {
+  document.getElementById("minutosSemana").textContent = calculateWeekMinutes(sessions);
 }
 
-// Muestra los días distintos estudiados en el mes actual.
-function mostrarDiasMes(sesiones) {
-  const dias = calcularDiasMes(sesiones);
-  document.getElementById("diasMes").textContent = dias;
+// Shows the distinct days studied this month.
+function renderMonthDays(sessions) {
+  const days = calculateMonthDays(sessions);
+  document.getElementById("diasMes").textContent = days;
   document.getElementById("diasMesTexto").textContent =
-    dias === 1 ? "día este mes" : "días este mes";
+    days === 1 ? "día este mes" : "días este mes";
 }
 
-// Muestra la lista de sesiones, de la más reciente a la más antigua.
-function mostrarSesiones(sesiones) {
-  const lista = document.getElementById("listaSesiones");
-  const vacio = document.getElementById("mensajeVacio");
+// Shows the session list, newest first.
+function renderSessions(sessions) {
+  const list = document.getElementById("listaSesiones");
+  const emptyMessage = document.getElementById("mensajeVacio");
 
-  lista.innerHTML = "";
+  list.innerHTML = "";
 
-  if (sesiones.length === 0) {
-    vacio.classList.remove("oculto");
+  if (sessions.length === 0) {
+    emptyMessage.classList.remove("oculto");
     return;
   }
-  vacio.classList.add("oculto");
+  emptyMessage.classList.add("oculto");
 
-  // Copiamos y ordenamos sin modificar el array original.
-  const ordenadas = [...sesiones].sort((a, b) => {
+  // Copy and sort without changing the original array.
+  const ordered = [...sessions].sort((a, b) => {
     if (a.date === b.date) return 0;
-    return a.date < b.date ? 1 : -1; // más reciente primero
+    return a.date < b.date ? 1 : -1; // newest first
   });
 
-  ordenadas.forEach((sesion) => {
+  ordered.forEach((session) => {
     const item = document.createElement("li");
     item.className = "sesion";
 
     const info = document.createElement("div");
     info.className = "sesion-info";
 
-    const tema = document.createElement("span");
-    tema.className = "sesion-tema";
-    tema.textContent = sesion.topic;
+    const topic = document.createElement("span");
+    topic.className = "sesion-tema";
+    topic.textContent = session.topic;
 
-    const fecha = document.createElement("span");
-    fecha.className = "sesion-fecha";
-    fecha.textContent = fechaBonita(sesion.date);
+    const date = document.createElement("span");
+    date.className = "sesion-fecha";
+    date.textContent = prettyDate(session.date);
 
-    info.appendChild(tema);
-    info.appendChild(fecha);
+    info.appendChild(topic);
+    info.appendChild(date);
 
-    const minutos = document.createElement("span");
-    minutos.className = "sesion-minutos";
-    minutos.textContent = `${sesion.minutes} min`;
+    const minutes = document.createElement("span");
+    minutes.className = "sesion-minutos";
+    minutes.textContent = `${session.minutes} min`;
 
     item.appendChild(info);
-    item.appendChild(minutos);
-    lista.appendChild(item);
+    item.appendChild(minutes);
+    list.appendChild(item);
   });
 }
 
 // ------------------------------------------------------------
-//  Calendario
+//  Calendar
 // ------------------------------------------------------------
 
-// Devuelve los meses ("AAAA-MM") con algún registro, del más antiguo al más
-// nuevo. Las fechas futuras no cuentan.
-function mesesConRegistros(sesiones) {
-  const hoy = hoyLocal();
-  const meses = sesiones
-    .map((s) => s.date)
-    .filter((date) => date <= hoy)
+// Returns the months ("YYYY-MM") with at least one record, oldest to newest.
+// Future dates do not count.
+function monthsWithRecords(sessions, today = todayLocal()) {
+  const months = sessions
+    .map((session) => session.date)
+    .filter((date) => date <= today)
     .map((date) => date.slice(0, 7));
-  return [...new Set(meses)].sort();
+  return [...new Set(months)].sort();
 }
 
-// Elige el mes que se muestra al abrir: el actual, acotado al rango de datos.
-function mesInicial(sesiones) {
-  const mesActual = hoyLocal().slice(0, 7);
-  const meses = mesesConRegistros(sesiones);
+// Chooses the month shown on load: the current one, clamped to the data range.
+function initialMonth(sessions, today = todayLocal()) {
+  const currentMonth = today.slice(0, 7);
+  const months = monthsWithRecords(sessions, today);
 
-  if (meses.length === 0) return textoAFecha(`${mesActual}-01`);
+  if (months.length === 0) return textToDate(`${currentMonth}-01`);
 
-  const minMes = meses[0];
-  const maxMes = meses[meses.length - 1];
+  const minMonth = months[0];
+  const maxMonth = months[months.length - 1];
 
-  let elegido = mesActual;
-  if (mesActual < minMes) elegido = minMes;
-  if (mesActual > maxMes) elegido = maxMes;
+  let chosen = currentMonth;
+  if (currentMonth < minMonth) chosen = minMonth;
+  if (currentMonth > maxMonth) chosen = maxMonth;
 
-  return textoAFecha(`${elegido}-01`);
+  return textToDate(`${chosen}-01`);
 }
 
-// Pinta el calendario del mes que se está viendo (variable global mesMostrado).
-function mostrarCalendario(sesiones) {
-  const dias = diasConSesion(sesiones);
-  const hoy = hoyLocal();
+// Renders the calendar for the month being viewed (global shownMonth).
+function renderCalendar(sessions, today = todayLocal()) {
+  const days = daysWithSession(sessions);
+  const year = shownMonth.getFullYear();
+  const month = shownMonth.getMonth();
+  const monthText = `${year}-${String(month + 1).padStart(2, "0")}`;
 
-  const anio = mesMostrado.getFullYear();
-  const mes = mesMostrado.getMonth();
-  const mesTexto = `${anio}-${String(mes + 1).padStart(2, "0")}`;
+  // Title: for example "octubre 2026".
+  document.getElementById("tituloMes").textContent = `${MONTHS[month]} ${year}`;
 
-  // Título: por ejemplo "octubre 2026".
-  document.getElementById("tituloMes").textContent = `${MESES[mes]} ${anio}`;
+  // Navigation limits: from the first to the last month with records.
+  const months = monthsWithRecords(sessions, today);
+  const minMonth = months.length ? months[0] : monthText;
+  const maxMonth = months.length ? months[months.length - 1] : monthText;
+  document.getElementById("mesAnterior").disabled = monthText <= minMonth;
+  document.getElementById("mesSiguiente").disabled = monthText >= maxMonth;
 
-  // Límites de navegación: del primer al último mes con registros.
-  const meses = mesesConRegistros(sesiones);
-  const minMes = meses.length ? meses[0] : mesTexto;
-  const maxMes = meses.length ? meses[meses.length - 1] : mesTexto;
-  document.getElementById("mesAnterior").disabled = mesTexto <= minMes;
-  document.getElementById("mesSiguiente").disabled = mesTexto >= maxMes;
+  const container = document.getElementById("calendario");
+  container.innerHTML = "";
 
-  const contenedor = document.getElementById("calendario");
-  contenedor.innerHTML = "";
-
-  // Cabecera con los nombres de los días (la semana empieza en lunes).
-  DIAS_SEMANA.forEach((nombre) => {
-    const celda = document.createElement("div");
-    celda.className = "dia-semana";
-    celda.textContent = nombre;
-    contenedor.appendChild(celda);
+  // Header with weekday names (the week starts on Monday).
+  WEEKDAYS.forEach((name) => {
+    const cell = document.createElement("div");
+    cell.className = "dia-semana";
+    cell.textContent = name;
+    container.appendChild(cell);
   });
 
-  // Huecos vacíos para que el día 1 caiga en su columna.
-  const primerDia = new Date(anio, mes, 1);
-  const huecos = (primerDia.getDay() + 6) % 7; // 0 = lunes
-  for (let i = 0; i < huecos; i++) {
-    const hueco = document.createElement("div");
-    hueco.className = "dia-vacio";
-    contenedor.appendChild(hueco);
+  // Empty cells so day 1 falls in its column.
+  const firstDay = new Date(year, month, 1);
+  const gaps = (firstDay.getDay() + 6) % 7; // 0 = Monday
+  for (let i = 0; i < gaps; i++) {
+    const gap = document.createElement("div");
+    gap.className = "dia-vacio";
+    container.appendChild(gap);
   }
 
-  // Un cuadro por cada día del mes.
-  const totalDias = new Date(anio, mes + 1, 0).getDate();
-  for (let dia = 1; dia <= totalDias; dia++) {
-    const fechaTexto = fechaALocal(new Date(anio, mes, dia));
+  // One cell per day of the month.
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  for (let day = 1; day <= totalDays; day++) {
+    const dateText = dateToLocal(new Date(year, month, day));
 
-    const celda = document.createElement("div");
-    celda.className = "dia";
-    celda.textContent = dia;
+    const cell = document.createElement("div");
+    cell.className = "dia";
+    cell.textContent = day;
 
-    // Se marca si hubo sesión y el día no es futuro.
-    if (fechaTexto <= hoy && dias.has(fechaTexto)) {
-      celda.classList.add("estudiado");
+    // Mark the day only when it has a session and is not in the future.
+    if (dateText <= today && days.has(dateText)) {
+      cell.classList.add("estudiado");
     }
 
-    contenedor.appendChild(celda);
+    container.appendChild(cell);
   }
 }
 
 // ------------------------------------------------------------
-//  Temporizador de sesión
+//  Session timer
 // ------------------------------------------------------------
 
-// Si al cancelar no se llega a estos minutos, no se guarda la sesión.
-const MINIMOS_PARA_GUARDAR = 8;
+// If a cancelled session does not reach this many minutes, it is not saved.
+const MIN_MINUTES_TO_SAVE = 8;
 
-// Estado de la sesión en marcha.
-let estadoSesion = "idle"; // "idle" | "corriendo" | "pausado"
-let estadoAntesCancelar = "idle";
-let minutosOriginal = 0;
-let segundosRestantes = 0;
-let intervaloSesion = null;
-let temaActual = "";
+// State of the running session.
+let sessionState = "idle"; // "idle" | "running" | "paused"
+let stateBeforeCancel = "idle";
+let originalMinutes = 0;
+let remainingSeconds = 0;
+let sessionInterval = null;
+let currentTopic = "";
 
-// Convierte segundos en texto "MM:SS".
-function formatearTiempo(segundos) {
-  const min = Math.floor(segundos / 60);
-  const seg = segundos % 60;
-  return `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
+// Converts seconds to "MM:SS".
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }
 
-// Muestra el tiempo que queda.
-function actualizarTemporizador() {
-  textoTemporizador.textContent = formatearTiempo(segundosRestantes);
+// Shows the time left.
+function updateTimer() {
+  timerText.textContent = formatTime(remainingSeconds);
 }
 
-// Bloquea o desbloquea el tema y los minutos mientras dura la sesión.
-function bloquearCampos(bloqueado) {
-  campoTema.disabled = bloqueado;
-  campoMinutos.disabled = bloqueado;
+// Locks or unlocks the topic and minutes while the session runs.
+function lockFields(locked) {
+  topicField.disabled = locked;
+  minutesField.disabled = locked;
 }
 
-// Reproduce un sonido breve de cañón con la Web Audio API (sin archivos).
-function reproducirSonidoCanon() {
+// Plays a short cannon sound with the Web Audio API (no external files).
+function playCannonSound() {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return;
 
-  const ctx = new AudioCtx();
-  const ahora = ctx.currentTime;
-  const duracion = 0.6;
+  const context = new AudioCtx();
+  const now = context.currentTime;
+  const duration = 0.6;
 
-  // "Boom": un tono grave que baja y se apaga rápido.
-  const osc = ctx.createOscillator();
-  const volumen = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(140, ahora);
-  osc.frequency.exponentialRampToValueAtTime(40, ahora + duracion);
-  volumen.gain.setValueAtTime(0.9, ahora);
-  volumen.gain.exponentialRampToValueAtTime(0.001, ahora + duracion);
-  osc.connect(volumen);
-  volumen.connect(ctx.destination);
-  osc.start(ahora);
-  osc.stop(ahora + duracion);
+  // "Boom": a low tone that drops and fades quickly.
+  const oscillator = context.createOscillator();
+  const volume = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(140, now);
+  oscillator.frequency.exponentialRampToValueAtTime(40, now + duration);
+  volume.gain.setValueAtTime(0.9, now);
+  volume.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  oscillator.connect(volume);
+  volume.connect(context.destination);
+  oscillator.start(now);
+  oscillator.stop(now + duration);
 
-  // "Crack" inicial: un ruido muy corto.
-  const muestras = Math.floor(ctx.sampleRate * 0.15);
-  const buffer = ctx.createBuffer(1, muestras, ctx.sampleRate);
-  const datos = buffer.getChannelData(0);
-  for (let i = 0; i < muestras; i++) {
-    datos[i] = (Math.random() * 2 - 1) * (1 - i / muestras);
+  // Initial "crack": a very short burst of noise.
+  const samples = Math.floor(context.sampleRate * 0.15);
+  const buffer = context.createBuffer(1, samples, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < samples; i++) {
+    data[i] = (Math.random() * 2 - 1) * (1 - i / samples);
   }
-  const ruido = ctx.createBufferSource();
-  const volumenRuido = ctx.createGain();
-  ruido.buffer = buffer;
-  volumenRuido.gain.setValueAtTime(0.5, ahora);
-  volumenRuido.gain.exponentialRampToValueAtTime(0.001, ahora + 0.15);
-  ruido.connect(volumenRuido);
-  volumenRuido.connect(ctx.destination);
-  ruido.start(ahora);
+  const noise = context.createBufferSource();
+  const noiseVolume = context.createGain();
+  noise.buffer = buffer;
+  noiseVolume.gain.setValueAtTime(0.5, now);
+  noiseVolume.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+  noise.connect(noiseVolume);
+  noiseVolume.connect(context.destination);
+  noise.start(now);
 
-  // Cerramos el contexto al terminar para liberar recursos.
-  osc.onended = () => ctx.close();
+  // Close the context when done to release resources.
+  oscillator.onended = () => context.close();
 }
 
-// Guarda la sesión con los minutos indicados y refresca la pantalla.
-function guardarSesion(minutos) {
-  sesiones.push({ date: hoyLocal(), topic: temaActual, minutes: minutos });
-  guardarSesiones(sesiones);
-  mostrarRacha(sesiones);
-  mostrarMinutosSemana(sesiones);
-  mostrarDiasMes(sesiones);
-  mostrarSesiones(sesiones);
-  mostrarCalendario(sesiones);
+// Saves the session with the given minutes and refreshes the screen.
+function saveSession(minutes) {
+  sessions.push({ date: todayLocal(), topic: currentTopic, minutes });
+  saveSessions(sessions);
+  renderStreak(sessions);
+  renderWeekMinutes(sessions);
+  renderMonthDays(sessions);
+  renderSessions(sessions);
+  renderCalendar(sessions);
 }
 
-// Deja el formulario listo para una sesión nueva.
-function reiniciarInterfazSesion() {
-  clearInterval(intervaloSesion);
-  intervaloSesion = null;
-  estadoSesion = "idle";
+// Leaves the form ready for a new session.
+function resetSessionUI() {
+  clearInterval(sessionInterval);
+  sessionInterval = null;
+  sessionState = "idle";
 
-  bloquearCampos(false);
-  botonAccion.classList.remove("oculto");
-  cajaTemporizador.classList.add("oculto");
-  controlesSesion.classList.add("oculto");
-  botonPausarReanudar.textContent = "Pausar sesión";
+  lockFields(false);
+  actionButton.classList.remove("oculto");
+  timerBox.classList.add("oculto");
+  sessionControls.classList.add("oculto");
+  pauseResumeButton.textContent = "Pausar sesión";
 
-  formulario.reset();
-  campoFecha.value = hoyLocal();
-  campoTema.focus();
+  form.reset();
+  dateField.value = todayLocal();
+  topicField.focus();
 }
 
-// Empieza la cuenta atrás.
-function iniciarSesion(tema, minutos) {
-  temaActual = tema;
-  minutosOriginal = minutos;
-  segundosRestantes = minutos * 60;
-  estadoSesion = "corriendo";
+// Starts the countdown.
+function startSession(topic, minutes) {
+  currentTopic = topic;
+  originalMinutes = minutes;
+  remainingSeconds = minutes * 60;
+  sessionState = "running";
 
-  bloquearCampos(true);
-  botonAccion.classList.add("oculto");
-  cajaTemporizador.classList.remove("oculto");
-  controlesSesion.classList.remove("oculto");
-  cajaMensajeFin.classList.add("oculto");
-  botonPausarReanudar.textContent = "Pausar sesión";
-  actualizarTemporizador();
+  lockFields(true);
+  actionButton.classList.add("oculto");
+  timerBox.classList.remove("oculto");
+  sessionControls.classList.remove("oculto");
+  endMessage.classList.add("oculto");
+  pauseResumeButton.textContent = "Pausar sesión";
+  updateTimer();
 
-  intervaloSesion = setInterval(ticSesion, 1000);
+  sessionInterval = setInterval(sessionTick, 1000);
 }
 
-// Cada segundo baja el tiempo restante.
-function ticSesion() {
-  segundosRestantes--;
-  if (segundosRestantes <= 0) {
-    segundosRestantes = 0;
-    actualizarTemporizador();
-    finalizarSesion();
+// Every second decreases the remaining time.
+function sessionTick() {
+  remainingSeconds--;
+  if (remainingSeconds <= 0) {
+    remainingSeconds = 0;
+    updateTimer();
+    finishSession();
     return;
   }
-  actualizarTemporizador();
+  updateTimer();
 }
 
-// Pausa o reanuda la cuenta atrás (un solo botón).
-function alternarPausarReanudar() {
-  if (estadoSesion === "corriendo") {
-    clearInterval(intervaloSesion);
-    intervaloSesion = null;
-    estadoSesion = "pausado";
-    botonPausarReanudar.textContent = "Reanudar sesión";
-  } else if (estadoSesion === "pausado") {
-    estadoSesion = "corriendo";
-    intervaloSesion = setInterval(ticSesion, 1000);
-    botonPausarReanudar.textContent = "Pausar sesión";
+// Pauses or resumes the countdown (single button).
+function togglePauseResume() {
+  if (sessionState === "running") {
+    clearInterval(sessionInterval);
+    sessionInterval = null;
+    sessionState = "paused";
+    pauseResumeButton.textContent = "Reanudar sesión";
+  } else if (sessionState === "paused") {
+    sessionState = "running";
+    sessionInterval = setInterval(sessionTick, 1000);
+    pauseResumeButton.textContent = "Pausar sesión";
   }
 }
 
-// Se agotó el tiempo: guardamos la sesión completa.
-function finalizarSesion() {
-  reiniciarInterfazSesion();
-  guardarSesion(minutosOriginal);
-  cajaMensajeFin.textContent = "¡Tiempo terminado! Sesión guardada.";
-  cajaMensajeFin.classList.remove("oculto");
-  reproducirSonidoCanon();
+// Time is up: save the full session.
+function finishSession() {
+  resetSessionUI();
+  saveSession(originalMinutes);
+  endMessage.textContent = "¡Tiempo terminado! Sesión guardada.";
+  endMessage.classList.remove("oculto");
+  playCannonSound();
 }
 
-// El usuario pulsa "Cancelar sesión".
-function cancelarSesion() {
-  // Guardamos si estaba corriendo o pausado para poder continuar después.
-  estadoAntesCancelar = estadoSesion;
+// The user presses "Cancelar sesión".
+function cancelSession() {
+  // Remember whether it was running or paused so it can resume later.
+  stateBeforeCancel = sessionState;
 
-  // Pausamos la cuenta atrás mientras se decide.
-  if (estadoSesion === "corriendo") {
-    clearInterval(intervaloSesion);
-    intervaloSesion = null;
+  // Pause the countdown while the user decides.
+  if (sessionState === "running") {
+    clearInterval(sessionInterval);
+    sessionInterval = null;
   }
 
-  const segundosRealizados = minutosOriginal * 60 - segundosRestantes;
-  const minutosRealizados = Math.floor(segundosRealizados / 60);
+  const elapsedSeconds = originalMinutes * 60 - remainingSeconds;
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
 
-  // Si llega al mínimo, se guarda directamente con el tiempo realizado.
-  if (minutosRealizados >= MINIMOS_PARA_GUARDAR) {
-    reiniciarInterfazSesion();
-    guardarSesion(minutosRealizados);
-    cajaMensajeFin.textContent = `Sesión guardada: ${minutosRealizados} min.`;
-    cajaMensajeFin.classList.remove("oculto");
+  // If it reaches the minimum, save it directly with the elapsed time.
+  if (elapsedMinutes >= MIN_MINUTES_TO_SAVE) {
+    resetSessionUI();
+    saveSession(elapsedMinutes);
+    endMessage.textContent = `Sesión guardada: ${elapsedMinutes} min.`;
+    endMessage.classList.remove("oculto");
     return;
   }
 
-  // Si no llega, preguntamos antes de descartarla.
-  estadoSesion = "pausado";
-  modalTexto.textContent =
-    `Has estudiado ${minutosRealizados} minuto(s). Como no llegas a ` +
-    `${MINIMOS_PARA_GUARDAR} minutos, si cancelas la sesión no se guardará. ` +
+  // Otherwise, ask before discarding it.
+  sessionState = "paused";
+  modalText.textContent =
+    `Has estudiado ${elapsedMinutes} minuto(s). Como no llegas a ` +
+    `${MIN_MINUTES_TO_SAVE} minutos, si cancelas la sesión no se guardará. ` +
     "¿Qué quieres hacer?";
-  modalCancelar.classList.remove("oculto");
+  cancelModal.classList.remove("oculto");
 }
 
-// El usuario decide seguir con la sesión.
-function continuarSesion() {
-  modalCancelar.classList.add("oculto");
+// The user decides to continue the session.
+function continueSession() {
+  cancelModal.classList.add("oculto");
 
-  if (estadoAntesCancelar === "corriendo") {
-    estadoSesion = "corriendo";
-    intervaloSesion = setInterval(ticSesion, 1000);
-    botonPausarReanudar.textContent = "Pausar sesión";
+  if (stateBeforeCancel === "running") {
+    sessionState = "running";
+    sessionInterval = setInterval(sessionTick, 1000);
+    pauseResumeButton.textContent = "Pausar sesión";
   } else {
-    estadoSesion = "pausado";
-    botonPausarReanudar.textContent = "Reanudar sesión";
+    sessionState = "paused";
+    pauseResumeButton.textContent = "Reanudar sesión";
   }
 }
 
-// El usuario confirma que cancela: no se guarda nada.
-function cancelarDefinitivo() {
-  modalCancelar.classList.add("oculto");
-  reiniciarInterfazSesion();
+// The user confirms cancellation: nothing is saved.
+function cancelDefinitively() {
+  cancelModal.classList.add("oculto");
+  resetSessionUI();
 }
 
 // ------------------------------------------------------------
-//  Poner todo en marcha
+//  Start everything
 // ------------------------------------------------------------
 
-const formulario = document.getElementById("formulario");
-const campoFecha = document.getElementById("fecha");
-const campoTema = document.getElementById("tema");
-const campoMinutos = document.getElementById("minutos");
-const cajaError = document.getElementById("error");
-const cajaNotaFecha = document.getElementById("notaFecha");
+const form = document.getElementById("formulario");
+const dateField = document.getElementById("fecha");
+const topicField = document.getElementById("tema");
+const minutesField = document.getElementById("minutos");
+const errorBox = document.getElementById("error");
+const dateNote = document.getElementById("notaFecha");
 
-// Referencias del temporizador.
-const cajaTemporizador = document.getElementById("temporizadorCaja");
-const textoTemporizador = document.getElementById("temporizador");
-const controlesSesion = document.getElementById("controlesSesion");
-const botonAccion = document.getElementById("botonAccion");
-const botonPausarReanudar = document.getElementById("botonPausarReanudar");
-const botonCancelar = document.getElementById("botonCancelar");
-const cajaMensajeFin = document.getElementById("mensajeFin");
-const modalCancelar = document.getElementById("modalCancelar");
-const modalTexto = document.getElementById("modalTexto");
-const modalContinuar = document.getElementById("modalContinuar");
-const modalCancelarDefinitivo = document.getElementById("modalCancelarDefinitivo");
+// Timer references.
+const timerBox = document.getElementById("temporizadorCaja");
+const timerText = document.getElementById("temporizador");
+const sessionControls = document.getElementById("controlesSesion");
+const actionButton = document.getElementById("botonAccion");
+const pauseResumeButton = document.getElementById("botonPausarReanudar");
+const cancelButton = document.getElementById("botonCancelar");
+const endMessage = document.getElementById("mensajeFin");
+const cancelModal = document.getElementById("modalCancelar");
+const modalText = document.getElementById("modalTexto");
+const modalContinue = document.getElementById("modalContinuar");
+const modalCancelDefinitive = document.getElementById("modalCancelarDefinitivo");
 
-// El campo de fecha queda fijo en hoy: solo se registra la fecha del equipo.
-campoFecha.readOnly = true;
-campoFecha.value = hoyLocal();
+// The date field is fixed to today: only the device's date can be recorded.
+dateField.readOnly = true;
+dateField.value = todayLocal();
 
-// Si se intenta cambiar la fecha, explicamos por qué no se puede.
-function avisarFechaBloqueada() {
-  cajaNotaFecha.textContent =
+// If the user tries to change the date, explain why they cannot.
+function warnDateLocked() {
+  dateNote.textContent =
     "Solo puedes registrar la sesión de hoy. Si la fecha de tu equipo es incorrecta, cámbiala en los ajustes del sistema.";
 }
-campoFecha.addEventListener("click", avisarFechaBloqueada);
-campoFecha.addEventListener("focus", avisarFechaBloqueada);
-campoFecha.addEventListener("keydown", (evento) => {
-  evento.preventDefault();
-  avisarFechaBloqueada();
+dateField.addEventListener("click", warnDateLocked);
+dateField.addEventListener("focus", warnDateLocked);
+dateField.addEventListener("keydown", (event) => {
+  event.preventDefault();
+  warnDateLocked();
 });
 
-// Al cargar la página pintamos todos los datos.
-let sesiones = leerSesiones();
-let mesMostrado = mesInicial(sesiones);
+// On load, render all data.
+let sessions = readSessions();
+let shownMonth = initialMonth(sessions);
 
-mostrarRacha(sesiones);
-mostrarMinutosSemana(sesiones);
-mostrarDiasMes(sesiones);
-mostrarSesiones(sesiones);
-mostrarCalendario(sesiones);
+renderStreak(sessions);
+renderWeekMinutes(sessions);
+renderMonthDays(sessions);
+renderSessions(sessions);
+renderCalendar(sessions);
 
-// Botones para cambiar de mes en el calendario.
+// Buttons to change the calendar month.
 document.getElementById("mesAnterior").addEventListener("click", () => {
-  mesMostrado = new Date(mesMostrado.getFullYear(), mesMostrado.getMonth() - 1, 1);
-  mostrarCalendario(sesiones);
+  shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() - 1, 1);
+  renderCalendar(sessions);
 });
 document.getElementById("mesSiguiente").addEventListener("click", () => {
-  mesMostrado = new Date(mesMostrado.getFullYear(), mesMostrado.getMonth() + 1, 1);
-  mostrarCalendario(sesiones);
+  shownMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 1);
+  renderCalendar(sessions);
 });
 
-// Controles del temporizador.
-botonPausarReanudar.addEventListener("click", alternarPausarReanudar);
-botonCancelar.addEventListener("click", cancelarSesion);
-modalContinuar.addEventListener("click", continuarSesion);
-modalCancelarDefinitivo.addEventListener("click", cancelarDefinitivo);
+// Timer controls.
+pauseResumeButton.addEventListener("click", togglePauseResume);
+cancelButton.addEventListener("click", cancelSession);
+modalContinue.addEventListener("click", continueSession);
+modalCancelDefinitive.addEventListener("click", cancelDefinitively);
 
-// Escape equivale a "continuar la sesión".
-document.addEventListener("keydown", (evento) => {
-  if (evento.key === "Escape" && !modalCancelar.classList.contains("oculto")) {
-    continuarSesion();
+// Escape means "continue the session".
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !cancelModal.classList.contains("oculto")) {
+    continueSession();
   }
 });
 
-// Al enviar el formulario, validamos e iniciamos el temporizador.
-formulario.addEventListener("submit", (evento) => {
-  evento.preventDefault();
+// On form submit, validate and start the timer.
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
 
-  // Si ya hay una sesión en marcha, no hacemos nada.
-  if (estadoSesion !== "idle") return;
+  // If a session is already running, do nothing.
+  if (sessionState !== "idle") return;
 
-  const tema = campoTema.value.trim();
-  const minutos = Number(campoMinutos.value);
+  const topic = topicField.value.trim();
+  const minutes = Number(minutesField.value);
 
-  // Validación sencilla con mensajes en español.
-  if (!tema) {
-    cajaError.textContent = "Escribe el tema de la sesión.";
+  // Simple validation with Spanish messages.
+  if (!topic) {
+    errorBox.textContent = "Escribe el tema de la sesión.";
     return;
   }
-  if (!minutos || minutos <= 0) {
-    cajaError.textContent = "Los minutos deben ser mayores que 0.";
+  if (!minutes || minutes <= 0) {
+    errorBox.textContent = "Los minutos deben ser mayores que 0.";
     return;
   }
 
-  cajaError.textContent = "";
-  cajaMensajeFin.classList.add("oculto");
-  iniciarSesion(tema, minutos);
+  errorBox.textContent = "";
+  endMessage.classList.add("oculto");
+  startSession(topic, minutes);
 });

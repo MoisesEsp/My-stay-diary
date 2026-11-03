@@ -4,7 +4,7 @@ aporte.
 ## Estado actual
 - v1 funcionando: registrar sesiones (fecha, tema, minutos), racha actual, mejor racha,
 total de minutos de la semana, días estudiados en el mes, lista de sesiones y calendario
-mensual. Modo temporizador.
+mensual. Modo temporizador. Código JS en inglés; textos en español.
 - Datos en localStorage.
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic.
@@ -30,6 +30,9 @@ trabajo con IA. No forman parte de la web ni deben afectar al doble clic.
 - Chrome DevTools MCP en `opencode.json` (paquete `@async23/...`) conecta con un Chromium
 que escuche CDP en `127.0.0.1:9222`; sin ese navegador las herramientas fallan. Snapshot y
 captura de viewport funcionan; la captura a página completa puede agotar el tiempo.
+- Constitución en `docs/constitution.md`. La lógica se adaptó: identificadores y comentarios
+en inglés, cálculos puros con `today` como parámetro y tests con `node --test`.
+- `tests/logic.test.js` cubre fechas, rachas, semana, mes y migración de datos.
 ## Aprendizajes y errores a evitar
 - OpenCode V2 exige `mcp.servers` con `type: "local"` y `command` como array. El formato
 `mcpServers` de Claude Desktop no se lee.

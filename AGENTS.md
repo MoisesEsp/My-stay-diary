@@ -8,8 +8,9 @@ programar.
 - Debe funcionar abriendo `index.html` con doble clic (`file://`): nada de módulos ES
 (`type="module"`), `fetch` a archivos locales ni nada que requiera servidor.
 ## Convenciones
-- Textos de la interfaz en español.
-- Código simple, nombres descriptivos y comentarios solo donde aporten.
+- Textos de la interfaz, mensajes y documentación en español.
+- Código (identificadores y comentarios) en inglés; nombres descriptivos y comentarios
+  solo donde aporten.
 - Diseño limpio y responsive; cualquier pantalla nueva debe verse bien en el móvil.
 - Estilo "cuaderno de estudio": papel cuadriculado, tinta verde y subrayador amarillo;
   serif para títulos y números, sans para la interfaz y mono para fechas y cronómetro.
@@ -68,15 +69,19 @@ porqué) y errores a evitar.
 - Si algo se convierte en una regla permanente, propón moverlo a `AGENTS.md` en lugar de
 dejarlo en la memoria.
 - No guardes nunca datos sensibles (claves, tokens, datos personales)
+## Comandos
+- Tests: `node --test`
+## Reglas
+- Lee `docs/constitution.md` y la spec activa (`specs/NNN-*/`) antes de tocar código.
 ## Límites
 - ✅ Siempre: respetar las reglas de fechas y racha, mantener los textos en español.
 - ✅ Siempre: actualizar `MEMORY.md` al terminar cada tarea.
 - ⚠️ Pregunta antes: crear archivos nuevos, cambiar el formato de los datos guardados.
 - 🚫 Nunca: añadir dependencias, frameworks o un paso de build.
 ## Verificación
-- No hay tests automáticos. Después de cada cambio, verifica con el MCP de Chrome
-DevTools: abre `index.html`, prueba la funcionalidad, revisa la consola y comprueba la
-vista móvil.
+- La lógica se prueba con `node --test` (sin instalar paquetes); no se avanza con tests en rojo.
+- Después de cada cambio, verifica la interfaz con el MCP de Chrome DevTools: abre
+`index.html`, prueba la funcionalidad, revisa la consola y comprueba 375 px.
 - Para empezar de cero: DevTools → Application → Local Storage → borrar la clave
 `diario-estudio-sesiones`.
 
