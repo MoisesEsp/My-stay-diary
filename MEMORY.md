@@ -3,8 +3,9 @@ Memoria del proyecto entre sesiones. Máximo ~50 líneas: resume o elimina lo qu
 aporte.
 ## Estado actual
 - v1 funcionando: registrar sesiones (fecha, tema, minutos), racha actual, mejor racha,
-total de minutos de la semana, días estudiados en el mes, lista de sesiones y calendario
-mensual. Modo temporizador. Código JS en inglés; textos en español.
+total de minutos de la semana, días estudiados en el mes, lista de sesiones, calendario
+mensual y mapa de calor de 12 semanas. Modo temporizador. Código JS en inglés; textos en
+español.
 - Datos en localStorage.
 ## Decisiones (y por qué)
 - Sin backend ni dependencias: cualquiera debe poder abrirlo con doble clic.
@@ -22,6 +23,8 @@ sesiones el mismo día se suman y los futuros no cuentan. No se persiste nada nu
 - Días del mes: días distintos con sesión del día 1 a hoy (mes natural, fecha local); varias
 sesiones el mismo día cuentan una vez, los futuros no cuentan y siempre es el mes actual,
 aunque se navegue en el calendario.
+- Mapa de calor (spec 001): 12 semanas, umbrales 30/60/90, "no transcurrido", resumen
+accesible, solo lectura, paleta azul de alto contraste; importar queda fuera; error y respaldo.
 - Diseño "cuaderno de estudio": papel cuadriculado, tinta verde y subrayador amarillo; serif
 para títulos y números, sans para la interfaz y mono para fechas y cronómetro. Sin fuentes
 externas ni imágenes, para que siga funcionando con doble clic.
@@ -32,7 +35,7 @@ que escuche CDP en `127.0.0.1:9222`; sin ese navegador las herramientas fallan. 
 captura de viewport funcionan; la captura a página completa puede agotar el tiempo.
 - Constitución en `docs/constitution.md`. La lógica se adaptó: identificadores y comentarios
 en inglés, cálculos puros con `today` como parámetro y tests con `node --test`.
-- `tests/logic.test.js` cubre fechas, rachas, semana, mes y migración de datos.
+- `tests/logic.test.js` cubre fechas, rachas, semana, mes, migración y mapa de calor.
 ## Aprendizajes y errores a evitar
 - OpenCode V2 exige `mcp.servers` con `type: "local"` y `command` como array. El formato
 `mcpServers` de Claude Desktop no se lee.
@@ -43,6 +46,5 @@ HeadlessChrome; se puede lanzar con `chromium --remote-debugging-port=9222`.
 - Probado con Chrome DevTools MCP: 3 sesiones (hoy, ayer y anteayer) → racha 3, mejor racha
 3, 75 min, consola limpia y 375 px sin desbordamiento. Plural «1 día / días este mes»
 corregido y probado con 1 y 3 días.
-- (vacío por ahora)
 ## Próximos pasos
-- (vacío por ahora)
+- Mapa de calor implementado y verificado con `node --test` y el MCP; pendiente commit.

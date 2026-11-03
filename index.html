@@ -83,6 +83,33 @@
       <p class="vacio" id="mensajeVacio">Todavía no hay sesiones. ¡Empieza hoy!</p>
     </section>
 
+    <!-- Mapa de calor de las últimas 12 semanas -->
+    <section class="tarjeta mapa-calor" aria-labelledby="tituloMapaCalor">
+      <h2 id="tituloMapaCalor">Últimas 12 semanas</h2>
+      <p class="mapa-calor-resumen" id="resumenMapaCalor" aria-live="polite"></p>
+
+      <div class="mapa-calor-meses-cuerpo" aria-hidden="true">
+        <span class="mapa-calor-meses-espacio"></span>
+        <div class="mapa-calor-meses" id="mesesMapaCalor"></div>
+      </div>
+
+      <div class="mapa-calor-cuerpo">
+        <div class="mapa-calor-dias" id="diasMapaCalor" aria-hidden="true">
+          <span>lun</span>
+          <span></span>
+          <span>mié</span>
+          <span></span>
+          <span>vie</span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="mapa-calor-cuadricula" id="cuadriculaMapaCalor" role="list"></div>
+      </div>
+
+      <p class="mapa-calor-mensaje oculto" id="mensajeMapaCalor"></p>
+      <div class="mapa-calor-leyenda" id="leyendaMapaCalor" aria-label="Leyenda del mapa de calor"></div>
+    </section>
+
     <!-- Calendario del mes -->
     <section class="tarjeta">
       <div class="calendario-cabecera">

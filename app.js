@@ -10,6 +10,9 @@ const STORAGE_KEY = "diario-estudio-sesiones";
 // Key used by older versions. Only needed for migration.
 const LEGACY_STORAGE_KEY = "diarioDeEstudio.sesiones";
 
+// Key used to preserve unreadable data before an overwrite.
+const BACKUP_STORAGE_KEY = "diario-estudio-sesiones-respaldo";
+
 // Spanish names for the calendar UI.
 const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -47,44 +50,82 @@ function prettyDate(text) {
   return `${day}/${month}/${year}`;
 }
 
+// Returns true when the text is a real local date in "YYYY-MM-DD" format.
+function isValidLocalDate(text) {
+  if (typeof text !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return false;
+  }
+  return dateToLocal(textToDate(text)) === text;
+}
+
+// Returns true when the value is a finite number greater than 0.
+function isValidMinutes(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 // ------------------------------------------------------------
 //  Read and write sessions
 // ------------------------------------------------------------
 
-// Reads saved sessions. Returns an empty list when there is nothing.
+// Reads saved sessions and reports whether the stored data was readable.
 function readSessions() {
-  const data = localStorage.getItem(STORAGE_KEY);
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (error) {
-      return [];
-    }
-  }
-
-  // No data under the new key. Check the legacy key and migrate the sessions
-  // to the current shape ({ date, topic, minutes }).
-  const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
-  if (!legacyData) return [];
-
   try {
-    const legacySessions = JSON.parse(legacyData);
-    const migrated = legacySessions.map((session) => ({
-      // Legacy Spanish keys are kept here only for compatibility.
-      date: session.date !== undefined ? session.date : session.fecha,
-      topic: session.topic !== undefined ? session.topic : session.tema,
-      minutes: session.minutes !== undefined ? session.minutes : session.minutos,
-    }));
-    saveSessions(migrated);
-    return migrated;
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data !== null) {
+      try {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          return { sessions: parsed, unreadable: false, raw: null };
+        }
+        return { sessions: [], unreadable: true, raw: data };
+      } catch (error) {
+        return { sessions: [], unreadable: true, raw: data };
+      }
+    }
+
+    // No data under the new key. Check the legacy key and migrate the sessions
+    // to the current shape ({ date, topic, minutes }).
+    const legacyData = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacyData === null) {
+      return { sessions: [], unreadable: false, raw: null };
+    }
+
+    try {
+      const legacySessions = JSON.parse(legacyData);
+      if (!Array.isArray(legacySessions)) {
+        return { sessions: [], unreadable: true, raw: legacyData };
+      }
+      const migrated = legacySessions.map((session) => ({
+        // Legacy Spanish keys are kept here only for compatibility.
+        date: session.date !== undefined ? session.date : session.fecha,
+        topic: session.topic !== undefined ? session.topic : session.tema,
+        minutes: session.minutes !== undefined ? session.minutes : session.minutos,
+      }));
+      saveSessions(migrated);
+      return { sessions: migrated, unreadable: false, raw: null };
+    } catch (error) {
+      return { sessions: [], unreadable: true, raw: legacyData };
+    }
   } catch (error) {
-    return [];
+    return { sessions: [], unreadable: true, raw: null };
   }
 }
 
-// Saves the full list of sessions.
-function saveSessions(sessions) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+// Saves the full list of sessions. Returns false when storage fails.
+function saveSessions(sessions, rawUnreadable = null) {
+  try {
+    if (rawUnreadable !== null && rawUnreadable !== undefined) {
+      const existingBackup = localStorage.getItem(BACKUP_STORAGE_KEY);
+      const backupKey = existingBackup !== null
+        ? `${BACKUP_STORAGE_KEY}-${Date.now()}`
+        : BACKUP_STORAGE_KEY;
+      localStorage.setItem(backupKey, rawUnreadable);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 // ------------------------------------------------------------
@@ -165,6 +206,13 @@ function startOfWeek(today = todayLocal()) {
   return dateToLocal(date);
 }
 
+// Returns the Monday 11 weeks before the week containing today.
+function heatMapWindowStart(today = todayLocal()) {
+  const start = textToDate(startOfWeek(today));
+  start.setDate(start.getDate() - 77);
+  return dateToLocal(start);
+}
+
 // Adds up the minutes of this week's sessions (Monday through today).
 function calculateWeekMinutes(sessions, today = todayLocal()) {
   const start = startOfWeek(today);
@@ -184,6 +232,124 @@ function calculateMonthDays(sessions, today = todayLocal()) {
   return [...daysWithSession(sessions)]
     .filter((day) => day.startsWith(monthPrefix) && day <= today)
     .length;
+}
+
+// Maps a day's total minutes to an intensity level from 0 to 4.
+function heatMapLevel(minutes) {
+  if (!isValidMinutes(minutes)) return 0;
+  if (minutes < 30) return 1;
+  if (minutes < 60) return 2;
+  if (minutes < 90) return 3;
+  return 4;
+}
+
+// Groups valid, non-future sessions by local date and sums their minutes.
+function groupValidSessionsByDate(sessions, today = todayLocal()) {
+  const byDate = new Map();
+  if (!Array.isArray(sessions)) return byDate;
+
+  sessions.forEach((session) => {
+    if (!session || typeof session !== "object") return;
+    if (!isValidLocalDate(session.date)) return;
+    if (!isValidMinutes(session.minutes)) return;
+    if (session.date > today) return;
+
+    byDate.set(session.date, (byDate.get(session.date) || 0) + session.minutes);
+  });
+
+  return byDate;
+}
+
+// Builds the 12-week heat map: 84 days, their levels and a summary.
+function buildHeatMap(sessions, today = todayLocal()) {
+  const start = heatMapWindowStart(today);
+  const startDate = textToDate(start);
+  const byDate = groupValidSessionsByDate(sessions, today);
+  const days = [];
+
+  for (let i = 0; i < 84; i++) {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + i);
+    const dateText = dateToLocal(date);
+    const isFuture = dateText > today;
+    const minutes = isFuture ? 0 : byDate.get(dateText) || 0;
+
+    days.push({
+      date: dateText,
+      minutes,
+      level: isFuture ? 0 : heatMapLevel(minutes),
+      isFuture,
+    });
+  }
+
+  const weeks = [];
+  for (let i = 0; i < 12; i++) {
+    weeks.push(days.slice(i * 7, i * 7 + 7));
+  }
+
+  return {
+    start,
+    today,
+    weeks,
+    summary: summarizeHeatMap(days),
+  };
+}
+
+// Counts days with valid minutes and adds up those minutes, excluding future days.
+function summarizeHeatMap(days) {
+  let daysWithStudy = 0;
+  let totalMinutes = 0;
+
+  days.forEach((day) => {
+    if (!day.isFuture && day.minutes > 0) {
+      daysWithStudy++;
+      totalMinutes += day.minutes;
+    }
+  });
+
+  return { daysWithStudy, totalMinutes };
+}
+
+// Builds the visible summary text for the period.
+function formatHeatMapSummary(summary) {
+  const minutes = String(summary.totalMinutes).replace(".", ",");
+  return `Periodo: 12 semanas · Días con estudio: ${summary.daysWithStudy} · Minutos totales: ${minutes}.`;
+}
+
+// Returns one month label per week, placed on the column that contains day 1.
+function monthLabelsForWeeks(weeks) {
+  const labels = Array(12).fill("");
+  let firstLabel = true;
+
+  weeks.forEach((week, index) => {
+    const firstDay = week.find((day) => day.date.endsWith("-01"));
+    if (!firstDay) return;
+
+    const date = textToDate(firstDay.date);
+    const month = date.getMonth();
+    let label = MONTHS[month].slice(0, 3);
+    if (firstLabel || month === 0 || month === 11) {
+      label += ` ${date.getFullYear()}`;
+    }
+
+    labels[index] = label;
+    firstLabel = false;
+  });
+
+  return labels;
+}
+
+// Builds the accessible label for one heat map day.
+function formatDayAriaLabel(day) {
+  const date = textToDate(day.date);
+  const dateText = `${date.getDate()} de ${MONTHS[date.getMonth()]} de ${date.getFullYear()}`;
+
+  if (day.isFuture) return `${dateText}: no transcurrido`;
+  if (day.minutes > 0) {
+    const minutes = String(day.minutes).replace(".", ",");
+    return `${dateText}: ${minutes} ${day.minutes === 1 ? "minuto" : "minutos"}`;
+  }
+  return `${dateText}: sin sesión`;
 }
 
 // ------------------------------------------------------------
@@ -207,6 +373,110 @@ function renderMonthDays(sessions) {
   document.getElementById("diasMes").textContent = days;
   document.getElementById("diasMesTexto").textContent =
     days === 1 ? "día este mes" : "días este mes";
+}
+
+// Renders the 84 heat map cells in chronological order.
+function renderHeatMapGrid(map) {
+  const grid = document.getElementById("cuadriculaMapaCalor");
+  grid.innerHTML = "";
+
+  map.weeks.forEach((week) => {
+    week.forEach((day) => {
+      const cell = document.createElement("span");
+      const state = day.isFuture ? "no-transcurrido" : `nivel-${day.level}`;
+      cell.className = `mapa-celda ${state}`;
+      cell.setAttribute("role", "listitem");
+      cell.setAttribute("aria-label", formatDayAriaLabel(day));
+      grid.appendChild(cell);
+    });
+  });
+}
+
+// Renders the month labels above the heat map.
+function renderHeatMapMonths(map) {
+  const labels = monthLabelsForWeeks(map.weeks);
+  const container = document.getElementById("mesesMapaCalor");
+  container.innerHTML = "";
+
+  labels.forEach((label) => {
+    const cell = document.createElement("span");
+    cell.textContent = label;
+    container.appendChild(cell);
+  });
+}
+
+// Renders the summary, or dashes when stored data is unreadable.
+function renderHeatMapSummary(summary, unreadable) {
+  const element = document.getElementById("resumenMapaCalor");
+  if (unreadable) {
+    element.textContent =
+      "Periodo: 12 semanas · Días con estudio: — · Minutos totales: —.";
+    return;
+  }
+  element.textContent = formatHeatMapSummary(summary);
+}
+
+// Shows the empty or error message, or hides it when there is data.
+function renderHeatMapMessage(summary, unreadable) {
+  const message = document.getElementById("mensajeMapaCalor");
+
+  if (unreadable) {
+    message.textContent = "No se pudieron leer las sesiones guardadas.";
+    message.classList.remove("oculto");
+    return;
+  }
+
+  if (summary.daysWithStudy === 0 && summary.totalMinutes === 0) {
+    message.textContent = "Aún no hay minutos registrados en estas 12 semanas.";
+    message.classList.remove("oculto");
+    return;
+  }
+
+  message.textContent = "";
+  message.classList.add("oculto");
+}
+
+// Renders the static legend with all intensity states.
+function renderHeatMapLegend() {
+  const legend = document.getElementById("leyendaMapaCalor");
+  const items = [
+    { className: "nivel-0", label: "Sin sesión (0 min)" },
+    { className: "nivel-1", label: "Menos de 30 min" },
+    { className: "nivel-2", label: "30 a menos de 60 min" },
+    { className: "nivel-3", label: "60 a menos de 90 min" },
+    { className: "nivel-4", label: "90 min o más" },
+    { className: "no-transcurrido", label: "No transcurrido" },
+  ];
+
+  legend.innerHTML = "";
+  legend.setAttribute("role", "list");
+
+  items.forEach((item) => {
+    const row = document.createElement("span");
+    row.className = "mapa-calor-leyenda-item";
+    row.setAttribute("role", "listitem");
+
+    const swatch = document.createElement("span");
+    swatch.className = `mapa-calor-muestra ${item.className}`;
+    swatch.setAttribute("aria-hidden", "true");
+
+    const text = document.createElement("span");
+    text.textContent = item.label;
+
+    row.appendChild(swatch);
+    row.appendChild(text);
+    legend.appendChild(row);
+  });
+}
+
+// Renders the whole heat map section.
+function renderHeatMap(sessions, unreadable = false) {
+  const map = buildHeatMap(sessions, todayLocal());
+  renderHeatMapMonths(map);
+  renderHeatMapGrid(map);
+  renderHeatMapSummary(map.summary, unreadable);
+  renderHeatMapMessage(map.summary, unreadable);
+  renderHeatMapLegend();
 }
 
 // Shows the session list, newest first.
@@ -419,13 +689,23 @@ function playCannonSound() {
 
 // Saves the session with the given minutes and refreshes the screen.
 function saveSession(minutes) {
-  sessions.push({ date: todayLocal(), topic: currentTopic, minutes });
-  saveSessions(sessions);
+  const session = { date: todayLocal(), topic: currentTopic, minutes };
+  sessions.push(session);
+  const saved = saveSessions(sessions, unreadableRaw);
+  if (!saved) {
+    sessions.pop();
+    return false;
+  }
+
+  unreadableRaw = null;
+  sessionsUnreadable = false;
   renderStreak(sessions);
   renderWeekMinutes(sessions);
   renderMonthDays(sessions);
   renderSessions(sessions);
   renderCalendar(sessions);
+  renderHeatMap(sessions, false);
+  return true;
 }
 
 // Leaves the form ready for a new session.
@@ -591,7 +871,10 @@ dateField.addEventListener("keydown", (event) => {
 });
 
 // On load, render all data.
-let sessions = readSessions();
+const loaded = readSessions();
+let sessions = loaded.sessions;
+let sessionsUnreadable = loaded.unreadable;
+let unreadableRaw = loaded.raw;
 let shownMonth = initialMonth(sessions);
 
 renderStreak(sessions);
@@ -599,6 +882,24 @@ renderWeekMinutes(sessions);
 renderMonthDays(sessions);
 renderSessions(sessions);
 renderCalendar(sessions);
+renderHeatMap(sessions, sessionsUnreadable);
+
+// Re-read stored data when the page becomes visible again.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+
+  const refreshed = readSessions();
+  sessions = refreshed.sessions;
+  sessionsUnreadable = refreshed.unreadable;
+  unreadableRaw = refreshed.raw;
+
+  renderStreak(sessions);
+  renderWeekMinutes(sessions);
+  renderMonthDays(sessions);
+  renderSessions(sessions);
+  renderCalendar(sessions);
+  renderHeatMap(sessions, sessionsUnreadable);
+});
 
 // Buttons to change the calendar month.
 document.getElementById("mesAnterior").addEventListener("click", () => {
