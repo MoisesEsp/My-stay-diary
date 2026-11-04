@@ -35,7 +35,7 @@ que escuche CDP en `127.0.0.1:9222`; sin ese navegador las herramientas fallan. 
 captura de viewport funcionan; la captura a página completa puede agotar el tiempo.
 - Constitución en `docs/constitution.md`. La lógica se adaptó: identificadores y comentarios
 en inglés, cálculos puros con `today` como parámetro y tests con `node --test`.
-- `tests/logic.test.js` cubre fechas, rachas, semana, mes, migración y mapa de calor.
+- `tests/logic.test.js` cubre fechas, rachas, semana, mes, migración y mapa de calor (24 tests).
 ## Aprendizajes y errores a evitar
 - OpenCode V2 exige `mcp.servers` con `type: "local"` y `command` como array. El formato
 `mcpServers` de Claude Desktop no se lee.
@@ -43,8 +43,8 @@ en inglés, cálculos puros con `today` como parámetro y tests con `node --test
 «No MCP servers configured»; conviene validarlo con `node -e JSON.parse`.
 - En este equipo el navegador está en `/usr/bin/chromium` y el puerto 9222 responde con
 HeadlessChrome; se puede lanzar con `chromium --remote-debugging-port=9222`.
-- Probado con Chrome DevTools MCP: 3 sesiones (hoy, ayer y anteayer) → racha 3, mejor racha
-3, 75 min, consola limpia y 375 px sin desbordamiento. Plural «1 día / días este mes»
-corregido y probado con 1 y 3 días.
+- Verificado con Chrome DevTools MCP: racha 3, 75 min, mapa 84 celdas, consola limpia y
+375 px sin desbordamiento; `forced-colors` solo por CSS (no se pudo emular). Plural «1 día /
+días este mes» corregido con 1 y 3 días.
 ## Próximos pasos
-- Mapa de calor implementado y verificado con `node --test` y el MCP; pendiente commit.
+- Spec 001 cerrada y publicada; pendiente versionar la skill y los comandos SDD (sin seguimiento).

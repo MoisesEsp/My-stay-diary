@@ -1,4 +1,5 @@
 # Especificación 001 — Mapa de calor de estudio
+Estado: implementada
 
 ## 1. Contexto y objetivo
 
