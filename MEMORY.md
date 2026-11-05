@@ -46,5 +46,5 @@ con `node -e JSON.parse`.
 - Verificado con MCP: racha 3, 75 min, mapa 84 celdas, consola limpia, 375 px sin
 desbordamiento y `forced-colors` solo por CSS.
 ## Próximos pasos
-- Spec 002 implementada y verificada (T-01 a T-10); pendiente validación formal y commit.
+- Spec 002 implementada, validada RF por RF y commiteada (`cf51746`); pendiente push.
 - Spec 001 cerrada y publicada; pendiente versionar la skill y los comandos SDD.
