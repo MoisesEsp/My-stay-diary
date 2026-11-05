@@ -13,6 +13,12 @@ const EXPORTS = [
   "prettyDate",
   "isValidLocalDate",
   "isValidMinutes",
+  "isValidGoalMinutes",
+  "parseGoalMinutes",
+  "formatMinutesValue",
+  "formatWeeklyProgress",
+  "formatGoalStatus",
+  "buildWeeklyGoalStatus",
   "daysWithSession",
   "calculateStreak",
   "calculateBestStreak",
@@ -31,6 +37,9 @@ const EXPORTS = [
   "formatDayAriaLabel",
   "readSessions",
   "saveSessions",
+  "readGoal",
+  "saveGoal",
+  "clearGoal",
   "formatTime",
 ];
 
@@ -84,29 +93,52 @@ function makeElement(tag = "div") {
   return element;
 }
 
-function makeStorage(initial = {}) {
+function makeStorage(
+  initial = {},
+  { failRead = false, failWrite = false, failRemove = false } = {},
+) {
   const values = new Map(Object.entries(initial));
+  const writes = [];
+
   return {
     getItem(key) {
+      if (failRead) throw new Error("read failed");
       return values.has(key) ? values.get(key) : null;
     },
     setItem(key, value) {
+      if (failWrite) throw new Error("write failed");
       values.set(key, String(value));
+      writes.push(key);
     },
     removeItem(key) {
+      if (failRemove) throw new Error("remove failed");
       values.delete(key);
+      writes.push(key);
     },
+    keys() {
+      return [...values.keys()];
+    },
+    writes,
   };
 }
 
 // Loads app.js in a minimal DOM so the pure functions can be tested without a browser.
-function loadApp({ sessions = null, legacySessions = null, rawStorage = null } = {}) {
+function loadApp({
+  sessions = null,
+  legacySessions = null,
+  rawStorage = null,
+  goal = null,
+  rawGoal = null,
+  storageOptions = {},
+} = {}) {
   const initial = {};
   if (sessions) initial["diario-estudio-sesiones"] = JSON.stringify(sessions);
   if (legacySessions) initial["diarioDeEstudio.sesiones"] = JSON.stringify(legacySessions);
   if (rawStorage) Object.assign(initial, rawStorage);
+  if (goal !== null) initial["diario-estudio-objetivo"] = JSON.stringify({ minutes: goal });
+  if (rawGoal !== null) initial["diario-estudio-objetivo"] = rawGoal;
 
-  const storage = makeStorage(initial);
+  const storage = makeStorage(initial, storageOptions);
   const elements = new Map();
   const document = {
     getElementById(id) {
@@ -174,6 +206,167 @@ test("isValidMinutes accepts only finite positive numbers", () => {
   assert.equal(api.isValidMinutes("30"), false);
   assert.equal(api.isValidMinutes(null), false);
   assert.equal(api.isValidMinutes(undefined), false);
+});
+
+test("isValidGoalMinutes accepts only integers between 1 and 10080", () => {
+  const { api } = loadApp();
+
+  assert.equal(api.isValidGoalMinutes(1), true);
+  assert.equal(api.isValidGoalMinutes(600), true);
+  assert.equal(api.isValidGoalMinutes(10080), true);
+
+  assert.equal(api.isValidGoalMinutes(0), false);
+  assert.equal(api.isValidGoalMinutes(-1), false);
+  assert.equal(api.isValidGoalMinutes(10081), false);
+  assert.equal(api.isValidGoalMinutes(12.5), false);
+  assert.equal(api.isValidGoalMinutes("600"), false);
+  assert.equal(api.isValidGoalMinutes(Number.NaN), false);
+  assert.equal(api.isValidGoalMinutes(Infinity), false);
+  assert.equal(api.isValidGoalMinutes(null), false);
+  assert.equal(api.isValidGoalMinutes(undefined), false);
+});
+
+test("parseGoalMinutes reads trimmed digit-only text", () => {
+  const { api } = loadApp();
+
+  assert.equal(api.parseGoalMinutes("1"), 1);
+  assert.equal(api.parseGoalMinutes("10080"), 10080);
+  assert.equal(api.parseGoalMinutes(" 600 "), 600);
+  assert.equal(api.parseGoalMinutes("030"), 30);
+
+  assert.equal(api.parseGoalMinutes("10081"), null);
+  assert.equal(api.parseGoalMinutes("0"), null);
+  assert.equal(api.parseGoalMinutes("-5"), null);
+  assert.equal(api.parseGoalMinutes("12.5"), null);
+  assert.equal(api.parseGoalMinutes("12,5"), null);
+  assert.equal(api.parseGoalMinutes("abc"), null);
+  assert.equal(api.parseGoalMinutes(""), null);
+  assert.equal(api.parseGoalMinutes("1e3"), null);
+  assert.equal(api.parseGoalMinutes("+5"), null);
+  assert.equal(api.parseGoalMinutes(null), null);
+  assert.equal(api.parseGoalMinutes(undefined), null);
+});
+
+test("formatMinutesValue uses the 'N min' format and comma decimals", () => {
+  const { api } = loadApp();
+
+  assert.equal(api.formatMinutesValue(600), "600 min");
+  assert.equal(api.formatMinutesValue(1), "1 min");
+  assert.equal(api.formatMinutesValue(99.5), "99,5 min");
+  assert.equal(api.formatMinutesValue(100), "100 min");
+  assert.equal(api.formatMinutesValue(0), "0 min");
+  // No thousands separator: the maximum goal reads "10080 min".
+  assert.equal(api.formatMinutesValue(10080), "10080 min");
+});
+
+test("formatWeeklyProgress uses the exact weekly label", () => {
+  const { api } = loadApp();
+
+  assert.equal(api.formatWeeklyProgress(0), "Minutos esta semana: 0 min");
+  assert.equal(api.formatWeeklyProgress(99.5), "Minutos esta semana: 99,5 min");
+  assert.equal(api.formatWeeklyProgress(600), "Minutos esta semana: 600 min");
+});
+
+test("formatGoalStatus returns the Spanish state or an empty text", () => {
+  const { api } = loadApp();
+
+  assert.equal(api.formatGoalStatus(true), "Objetivo alcanzado");
+  assert.equal(api.formatGoalStatus(false), "Objetivo no alcanzado");
+  assert.equal(api.formatGoalStatus(null), "");
+});
+
+test("buildWeeklyGoalStatus reports no goal for invalid goal values", () => {
+  const { api } = loadApp();
+  const today = "2026-11-04";
+  const sessions = [session("2026-11-02", 30), session("2026-11-04", 20)];
+
+  [null, undefined, 0, 10081].forEach((goal) => {
+    const status = api.buildWeeklyGoalStatus(sessions, goal, today);
+
+    assert.equal(status.hasGoal, false);
+    assert.equal(status.goal, null);
+    assert.equal(status.reached, null);
+    // The weekly progress is still reported, but there is nothing to compare it with.
+    assert.equal(status.progress, 50);
+  });
+});
+
+test("buildWeeklyGoalStatus compares the real progress with the goal", () => {
+  const { api } = loadApp();
+  const today = "2026-11-04";
+
+  const below = api.buildWeeklyGoalStatus([session("2026-11-04", 99)], 100, today);
+  assert.deepEqual({ ...below }, { hasGoal: true, goal: 100, progress: 99, reached: false });
+
+  const equal = api.buildWeeklyGoalStatus([session("2026-11-04", 100)], 100, today);
+  assert.deepEqual({ ...equal }, { hasGoal: true, goal: 100, progress: 100, reached: true });
+
+  // Above the goal: reached and the real progress is not trimmed to the goal.
+  const above = api.buildWeeklyGoalStatus(
+    [session("2026-11-02", 100), session("2026-11-04", 30)],
+    100,
+    today,
+  );
+  assert.deepEqual({ ...above }, { hasGoal: true, goal: 100, progress: 130, reached: true });
+
+  // Decimals are compared without rounding: 99.5 does not reach 100.
+  const decimalBelow = api.buildWeeklyGoalStatus([session("2026-11-04", 99.5)], 100, today);
+  assert.equal(decimalBelow.progress, 99.5);
+  assert.equal(decimalBelow.reached, false);
+
+  // 100.0 minutes do reach a goal of 100.
+  const decimalEqual = api.buildWeeklyGoalStatus([session("2026-11-04", 100.0)], 100, today);
+  assert.equal(decimalEqual.progress, 100);
+  assert.equal(decimalEqual.reached, true);
+
+  // Goal limits: 1 and 10080.
+  const minimum = api.buildWeeklyGoalStatus([session("2026-11-04", 1)], 1, today);
+  assert.equal(minimum.reached, true);
+  const maximum = api.buildWeeklyGoalStatus([session("2026-11-04", 10080)], 10080, today);
+  assert.equal(maximum.reached, true);
+});
+
+test("buildWeeklyGoalStatus counts Monday through today only", () => {
+  const { api } = loadApp();
+
+  // Wednesday: several sessions today, one yesterday, a future one and the previous Sunday.
+  const wednesdaySessions = [
+    session("2026-11-04", 30),
+    session("2026-11-04", 15),
+    session("2026-11-03", 25),
+    session("2026-11-05", 99), // future
+    session("2026-11-01", 40), // previous Sunday
+  ];
+  const wednesday = api.buildWeeklyGoalStatus(wednesdaySessions, 100, "2026-11-04");
+  assert.equal(wednesday.progress, 70);
+  assert.equal(wednesday.reached, false);
+  assert.equal(wednesday.progress, api.calculateWeekMinutes(wednesdaySessions, "2026-11-04"));
+
+  // Monday: only today counts.
+  const mondaySessions = [
+    session("2026-11-02", 40),
+    session("2026-11-01", 60), // previous Sunday
+    session("2026-11-03", 50), // future
+  ];
+  const monday = api.buildWeeklyGoalStatus(mondaySessions, 40, "2026-11-02");
+  assert.equal(monday.progress, 40);
+  assert.equal(monday.reached, true);
+  assert.equal(monday.progress, api.calculateWeekMinutes(mondaySessions, "2026-11-02"));
+
+  // Sunday: the whole week counts, but the next Monday does not.
+  const sundaySessions = [
+    session("2026-11-02", 20),
+    session("2026-11-08", 30),
+    session("2026-11-09", 90), // next Monday, future
+  ];
+  const sunday = api.buildWeeklyGoalStatus(sundaySessions, 60, "2026-11-08");
+  assert.equal(sunday.progress, 50);
+  assert.equal(sunday.reached, false);
+  assert.equal(sunday.progress, api.calculateWeekMinutes(sundaySessions, "2026-11-08"));
+
+  // No sessions this week: progress is 0.
+  const empty = api.buildWeeklyGoalStatus([], 100, "2026-11-04");
+  assert.deepEqual({ ...empty }, { hasGoal: true, goal: 100, progress: 0, reached: false });
 });
 
 test("startOfWeek uses Monday as the first day", () => {
@@ -379,6 +572,178 @@ test("saveSessions backs up unreadable data before overwriting", () => {
   const stored = JSON.parse(storage.getItem("diario-estudio-sesiones"));
   assert.equal(stored.length, 1);
   assert.equal(stored[0].minutes, 30);
+});
+
+test("readGoal reports no goal when the key is missing", () => {
+  const { api } = loadApp();
+
+  assert.deepEqual({ ...api.readGoal() }, { goal: null, unreadable: false, raw: null });
+});
+
+test("readGoal reads a valid stored goal", () => {
+  const { api } = loadApp({ rawStorage: { "diario-estudio-objetivo": '{"minutes":600}' } });
+  assert.deepEqual({ ...api.readGoal() }, { goal: 600, unreadable: false, raw: null });
+
+  const minimum = loadApp({ rawStorage: { "diario-estudio-objetivo": '{"minutes":1}' } });
+  assert.equal(minimum.api.readGoal().goal, 1);
+
+  const maximum = loadApp({ rawStorage: { "diario-estudio-objetivo": '{"minutes":10080}' } });
+  assert.equal(maximum.api.readGoal().goal, 10080);
+});
+
+test("readGoal treats unknown shapes as unreadable and keeps the raw text", () => {
+  const rawValues = [
+    "{not json",
+    "[600]",
+    "null",
+    "600",
+    '{"minutes":0}',
+    '{"minutes":12.5}',
+    '{"minutes":10081}',
+    '{"minutes":"600"}',
+  ];
+
+  rawValues.forEach((raw) => {
+    const { api } = loadApp({ rawStorage: { "diario-estudio-objetivo": raw } });
+    const result = api.readGoal();
+
+    assert.deepEqual(
+      { ...result },
+      { goal: null, unreadable: true, raw },
+      `expected "${raw}" to be unreadable`,
+    );
+  });
+});
+
+test("readGoal reports an unreadable goal when storage fails", () => {
+  const { api } = loadApp({ storageOptions: { failRead: true } });
+
+  assert.deepEqual({ ...api.readGoal() }, { goal: null, unreadable: true, raw: null });
+});
+
+test("saveGoal backs up the unreadable value before writing the new goal", () => {
+  const raw = "{not json";
+  const { api, storage } = loadApp({ rawGoal: raw });
+
+  assert.equal(api.saveGoal(600, raw), true);
+  assert.equal(storage.getItem("diario-estudio-objetivo-respaldo"), raw);
+  assert.deepEqual(JSON.parse(storage.getItem("diario-estudio-objetivo")), { minutes: 600 });
+  // The backup is written first so the original value is never lost.
+  assert.deepEqual(storage.writes, [
+    "diario-estudio-objetivo-respaldo",
+    "diario-estudio-objetivo",
+  ]);
+
+  // The saved goal survives a later read.
+  assert.deepEqual({ ...api.readGoal() }, { goal: 600, unreadable: false, raw: null });
+});
+
+test("saveGoal keeps an existing backup and adds a timestamped one", () => {
+  const raw = "{another bad goal";
+  const { api, storage } = loadApp({
+    rawGoal: raw,
+    rawStorage: { "diario-estudio-objetivo-respaldo": "previous backup" },
+  });
+
+  assert.equal(api.saveGoal(1200, raw), true);
+  assert.equal(storage.getItem("diario-estudio-objetivo-respaldo"), "previous backup");
+
+  const timestamped = storage
+    .keys()
+    .filter((key) => key.startsWith("diario-estudio-objetivo-respaldo-"));
+  assert.equal(timestamped.length, 1);
+  assert.equal(storage.getItem(timestamped[0]), raw);
+  assert.deepEqual(JSON.parse(storage.getItem("diario-estudio-objetivo")), { minutes: 1200 });
+});
+
+test("saveGoal rejects invalid minutes without writing anything", () => {
+  const { api, storage } = loadApp();
+  const invalid = [0, -1, 10081, 12.5, "600", null, undefined, Number.NaN];
+
+  invalid.forEach((value) => {
+    assert.equal(api.saveGoal(value), false);
+    assert.equal(api.saveGoal(value, "{bad goal"), false);
+  });
+
+  assert.deepEqual(storage.keys(), []);
+  assert.deepEqual(storage.writes, []);
+});
+
+test("saveGoal keeps the previous goal when the write fails", () => {
+  const { api, storage } = loadApp({ goal: 600, storageOptions: { failWrite: true } });
+
+  assert.equal(api.saveGoal(300), false);
+  assert.deepEqual(JSON.parse(storage.getItem("diario-estudio-objetivo")), { minutes: 600 });
+  assert.deepEqual({ ...api.readGoal() }, { goal: 600, unreadable: false, raw: null });
+});
+
+test("saveGoal does not overwrite an unreadable value if its backup fails", () => {
+  const raw = "{not json";
+  const { api, storage } = loadApp({ rawGoal: raw, storageOptions: { failWrite: true } });
+
+  assert.equal(api.saveGoal(600, raw), false);
+  assert.equal(storage.getItem("diario-estudio-objetivo"), raw);
+  assert.equal(storage.getItem("diario-estudio-objetivo-respaldo"), null);
+});
+
+test("clearGoal removes only the goal key", () => {
+  const sessions = [session("2026-11-04", 30)];
+  const { api, storage } = loadApp({ goal: 600, sessions });
+  const sessionsBefore = storage.getItem("diario-estudio-sesiones");
+
+  assert.equal(api.clearGoal(), true);
+  assert.equal(storage.getItem("diario-estudio-objetivo"), null);
+  assert.equal(storage.getItem("diario-estudio-sesiones"), sessionsBefore);
+  assert.deepEqual({ ...api.readGoal() }, { goal: null, unreadable: false, raw: null });
+});
+
+test("clearGoal keeps the goal when removing it fails", () => {
+  const { api, storage } = loadApp({ goal: 600, storageOptions: { failRemove: true } });
+
+  assert.equal(api.clearGoal(), false);
+  assert.deepEqual(JSON.parse(storage.getItem("diario-estudio-objetivo")), { minutes: 600 });
+});
+
+test("goal storage never touches the sessions key", () => {
+  const sessions = [session("2026-11-04", 30)];
+  const { api, storage } = loadApp({ sessions, rawGoal: "{not json" });
+  const sessionsBefore = storage.getItem("diario-estudio-sesiones");
+
+  assert.equal(api.saveGoal(600, "{not json"), true);
+  assert.equal(api.clearGoal(), true);
+  assert.equal(api.saveGoal(300), true);
+
+  assert.equal(storage.getItem("diario-estudio-sesiones"), sessionsBefore);
+  assert.equal(storage.writes.includes("diario-estudio-sesiones"), false);
+  assert.equal(storage.writes.includes("diario-estudio-sesiones-respaldo"), false);
+});
+
+test("an unreadable goal does not change readable sessions", () => {
+  const sessionsRaw = JSON.stringify([{ date: "2026-11-04", topic: "Test", minutes: 30 }]);
+  const { api, storage } = loadApp({
+    rawStorage: {
+      "diario-estudio-sesiones": sessionsRaw,
+      "diario-estudio-objetivo": "{not json",
+    },
+  });
+
+  assert.deepEqual({ ...api.readGoal() }, { goal: null, unreadable: true, raw: "{not json" });
+  assert.equal(api.readSessions().unreadable, false);
+  assert.equal(storage.getItem("diario-estudio-sesiones"), sessionsRaw);
+});
+
+test("a valid goal is still read when sessions are unreadable", () => {
+  const { api, storage } = loadApp({
+    rawStorage: {
+      "diario-estudio-sesiones": "{bad sessions",
+      "diario-estudio-objetivo": '{"minutes":600}',
+    },
+  });
+  const sessionsRaw = storage.getItem("diario-estudio-sesiones");
+
+  assert.deepEqual({ ...api.readGoal() }, { goal: 600, unreadable: false, raw: null });
+  assert.equal(api.readSessions().unreadable, true);
+  assert.equal(storage.getItem("diario-estudio-sesiones"), sessionsRaw);
 });
 
 test("calculateStreak counts consecutive days ending today", () => {

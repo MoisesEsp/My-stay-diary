@@ -13,6 +13,12 @@ const LEGACY_STORAGE_KEY = "diarioDeEstudio.sesiones";
 // Key used to preserve unreadable data before an overwrite.
 const BACKUP_STORAGE_KEY = "diario-estudio-sesiones-respaldo";
 
+// Key used to store the single weekly goal.
+const GOAL_STORAGE_KEY = "diario-estudio-objetivo";
+
+// Key used to preserve an unreadable goal before an overwrite.
+const GOAL_BACKUP_STORAGE_KEY = "diario-estudio-objetivo-respaldo";
+
 // Spanish names for the calendar UI.
 const MONTHS = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -61,6 +67,44 @@ function isValidLocalDate(text) {
 // Returns true when the value is a finite number greater than 0.
 function isValidMinutes(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+// Returns true when the value is a whole number of minutes in the weekly goal range.
+function isValidGoalMinutes(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 10080;
+}
+
+// Reads the goal field text. Only digits are accepted, so "1e3", "+5" or "" fail.
+function parseGoalMinutes(text) {
+  if (typeof text !== "string") {
+    return null;
+  }
+  const clean = text.trim();
+  if (!/^\d+$/.test(clean)) {
+    return null;
+  }
+  const value = Number(clean);
+  if (!isValidGoalMinutes(value)) {
+    return null;
+  }
+  return value;
+}
+
+// Shows a number of minutes as "N min", using a comma for decimals.
+// It does not add a thousands separator, so 10080 reads "10080 min".
+function formatMinutesValue(minutes) {
+  return `${String(minutes).replace(".", ",")} min`;
+}
+
+// Builds the weekly progress label of the goal card.
+function formatWeeklyProgress(minutes) {
+  return `Minutos esta semana: ${formatMinutesValue(minutes)}`;
+}
+
+// Turns the goal result into text. No goal means no status at all.
+function formatGoalStatus(reached) {
+  if (reached === null) return "";
+  return reached ? "Objetivo alcanzado" : "Objetivo no alcanzado";
 }
 
 // ------------------------------------------------------------
@@ -122,6 +166,74 @@ function saveSessions(sessions, rawUnreadable = null) {
       localStorage.setItem(backupKey, rawUnreadable);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// ------------------------------------------------------------
+//  Read and write the weekly goal
+// ------------------------------------------------------------
+
+// Reads the saved weekly goal and reports whether the stored value was readable.
+// An unreadable goal is treated as "no goal", but its raw text is returned so it
+// can be backed up before the next write.
+function readGoal() {
+  let raw;
+  try {
+    raw = localStorage.getItem(GOAL_STORAGE_KEY);
+  } catch (error) {
+    return { goal: null, unreadable: true, raw: null };
+  }
+
+  if (raw === null) {
+    return { goal: null, unreadable: false, raw: null };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      isValidGoalMinutes(parsed.minutes)
+    ) {
+      return { goal: parsed.minutes, unreadable: false, raw: null };
+    }
+  } catch (error) {
+    // Invalid JSON falls through and is treated as unreadable.
+  }
+
+  return { goal: null, unreadable: true, raw };
+}
+
+// Saves the weekly goal. An unreadable value is backed up before being replaced.
+// Returns false when storage fails or the minutes are not a valid goal.
+function saveGoal(minutes, rawUnreadable = null) {
+  if (!isValidGoalMinutes(minutes)) {
+    return false;
+  }
+
+  try {
+    if (rawUnreadable !== null && rawUnreadable !== undefined) {
+      const existingBackup = localStorage.getItem(GOAL_BACKUP_STORAGE_KEY);
+      const backupKey = existingBackup !== null
+        ? `${GOAL_BACKUP_STORAGE_KEY}-${Date.now()}`
+        : GOAL_BACKUP_STORAGE_KEY;
+      localStorage.setItem(backupKey, rawUnreadable);
+    }
+    localStorage.setItem(GOAL_STORAGE_KEY, JSON.stringify({ minutes }));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Removes the weekly goal. Backups are kept as extra copies.
+function clearGoal() {
+  try {
+    localStorage.removeItem(GOAL_STORAGE_KEY);
     return true;
   } catch (error) {
     return false;
@@ -219,6 +331,23 @@ function calculateWeekMinutes(sessions, today = todayLocal()) {
   return sessions
     .filter((session) => session.date >= start && session.date <= today)
     .reduce((total, session) => total + session.minutes, 0);
+}
+
+// Compares this week's progress with the weekly goal.
+// It reuses calculateWeekMinutes so both cards can never disagree.
+function buildWeeklyGoalStatus(sessions, goalMinutes, today = todayLocal()) {
+  const progress = calculateWeekMinutes(sessions, today);
+
+  if (!isValidGoalMinutes(goalMinutes)) {
+    return { hasGoal: false, goal: null, progress, reached: null };
+  }
+
+  return {
+    hasGoal: true,
+    goal: goalMinutes,
+    progress,
+    reached: progress >= goalMinutes,
+  };
 }
 
 // ------------------------------------------------------------
@@ -362,9 +491,62 @@ function renderStreak(sessions) {
   document.getElementById("mejorRachaNumero").textContent = calculateBestStreak(sessions);
 }
 
-// Shows the minutes studied this week.
-function renderWeekMinutes(sessions) {
-  document.getElementById("minutosSemana").textContent = calculateWeekMinutes(sessions);
+// Shows the minutes studied this week, or dashes when stored data is unreadable.
+function renderWeekMinutes(sessions, sessionsUnreadable = false) {
+  const number = document.getElementById("minutosSemana");
+  const label = document.getElementById("minutosSemanaTexto");
+
+  if (sessionsUnreadable) {
+    number.textContent = "— min";
+    label.textContent = "";
+    return;
+  }
+
+  number.textContent = calculateWeekMinutes(sessions);
+  label.textContent = "min esta semana";
+}
+
+// Shows the weekly goal, its progress and whether it has been reached.
+// The form error is not touched here: it only changes when saving or removing.
+function renderWeeklyGoal(sessions, goalMinutes, sessionsUnreadable = false) {
+  const status = buildWeeklyGoalStatus(sessions, goalMinutes);
+
+  const goalLine = document.getElementById("lineaObjetivo");
+  const goalValue = document.getElementById("valorObjetivo");
+  if (status.hasGoal) {
+    goalValue.textContent = formatMinutesValue(status.goal);
+    goalLine.classList.remove("oculto");
+  } else {
+    goalValue.textContent = "";
+    goalLine.classList.add("oculto");
+  }
+
+  document.getElementById("progresoObjetivo").textContent = sessionsUnreadable
+    ? "Minutos esta semana: — min"
+    : formatWeeklyProgress(status.progress);
+
+  document.getElementById("estadoObjetivo").textContent =
+    sessionsUnreadable || !status.hasGoal ? "" : formatGoalStatus(status.reached);
+
+  const invitation = document.getElementById("invitacionObjetivo");
+  if (status.hasGoal) {
+    invitation.classList.add("oculto");
+  } else {
+    invitation.classList.remove("oculto");
+  }
+
+  document.getElementById("errorProgresoObjetivo").textContent =
+    sessionsUnreadable ? "No se puede calcular el progreso." : "";
+
+  document.getElementById("botonObjetivo").textContent =
+    status.hasGoal ? "Cambiar objetivo" : "Fijar objetivo";
+
+  const removeButton = document.getElementById("botonQuitarObjetivo");
+  if (status.hasGoal) {
+    removeButton.classList.remove("oculto");
+  } else {
+    removeButton.classList.add("oculto");
+  }
 }
 
 // Shows the distinct days studied this month.
@@ -700,7 +882,8 @@ function saveSession(minutes) {
   unreadableRaw = null;
   sessionsUnreadable = false;
   renderStreak(sessions);
-  renderWeekMinutes(sessions);
+  renderWeekMinutes(sessions, false);
+  renderWeeklyGoal(sessions, goal, false);
   renderMonthDays(sessions);
   renderSessions(sessions);
   renderCalendar(sessions);
@@ -840,6 +1023,7 @@ const topicField = document.getElementById("tema");
 const minutesField = document.getElementById("minutos");
 const errorBox = document.getElementById("error");
 const dateNote = document.getElementById("notaFecha");
+const goalField = document.getElementById("minutosObjetivo");
 
 // Timer references.
 const timerBox = document.getElementById("temporizadorCaja");
@@ -875,16 +1059,26 @@ const loaded = readSessions();
 let sessions = loaded.sessions;
 let sessionsUnreadable = loaded.unreadable;
 let unreadableRaw = loaded.raw;
+
+const loadedGoal = readGoal();
+let goal = loadedGoal.goal;
+let goalRaw = loadedGoal.raw;
+
 let shownMonth = initialMonth(sessions);
 
+// Fill the goal field once on load; later renders never rewrite it.
+goalField.value = goal !== null ? String(goal) : "";
+
 renderStreak(sessions);
-renderWeekMinutes(sessions);
+renderWeekMinutes(sessions, sessionsUnreadable);
+renderWeeklyGoal(sessions, goal, sessionsUnreadable);
 renderMonthDays(sessions);
 renderSessions(sessions);
 renderCalendar(sessions);
 renderHeatMap(sessions, sessionsUnreadable);
 
 // Re-read stored data when the page becomes visible again.
+// The goal is re-read too, so changes made in another tab are reflected.
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState !== "visible") return;
 
@@ -893,8 +1087,18 @@ document.addEventListener("visibilitychange", () => {
   sessionsUnreadable = refreshed.unreadable;
   unreadableRaw = refreshed.raw;
 
+  const refreshedGoal = readGoal();
+  goal = refreshedGoal.goal;
+  goalRaw = refreshedGoal.raw;
+
+  // Do not overwrite what the person is typing in the goal field.
+  if (document.activeElement !== goalField) {
+    goalField.value = goal !== null ? String(goal) : "";
+  }
+
   renderStreak(sessions);
-  renderWeekMinutes(sessions);
+  renderWeekMinutes(sessions, sessionsUnreadable);
+  renderWeeklyGoal(sessions, goal, sessionsUnreadable);
   renderMonthDays(sessions);
   renderSessions(sessions);
   renderCalendar(sessions);
@@ -947,4 +1151,48 @@ form.addEventListener("submit", (event) => {
   errorBox.textContent = "";
   endMessage.classList.add("oculto");
   startSession(topic, minutes);
+});
+
+// Weekly goal form: fix, change or remove the goal.
+// The button text and the card are updated by renderWeeklyGoal, never here.
+const goalForm = document.getElementById("formularioObjetivo");
+const goalError = document.getElementById("errorObjetivo");
+const removeGoalButton = document.getElementById("botonQuitarObjetivo");
+
+goalForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const minutes = parseGoalMinutes(goalField.value);
+
+  // Invalid text: keep the previous goal and whatever the person typed.
+  if (minutes === null) {
+    goalError.textContent =
+      "El objetivo debe ser un número entero de minutos entre 1 y 10.080";
+    return;
+  }
+
+  // An unreadable stored goal is backed up before being replaced.
+  if (!saveGoal(minutes, goalRaw)) {
+    goalError.textContent = "No se pudo guardar el objetivo. Inténtalo de nuevo.";
+    return;
+  }
+
+  goal = minutes;
+  goalRaw = null;
+  goalError.textContent = "";
+  goalField.value = String(minutes);
+  renderWeeklyGoal(sessions, goal, sessionsUnreadable);
+});
+
+removeGoalButton.addEventListener("click", () => {
+  if (!clearGoal()) {
+    goalError.textContent = "No se pudo quitar el objetivo. Inténtalo de nuevo.";
+    return;
+  }
+
+  goal = null;
+  goalRaw = null;
+  goalError.textContent = "";
+  goalField.value = "";
+  renderWeeklyGoal(sessions, goal, sessionsUnreadable);
 });

@@ -29,13 +29,45 @@
       <div class="racha-fila">
         <div class="racha-bloque">
           <span class="racha-numero" id="minutosSemana">0</span>
-          <span class="racha-texto">min esta semana</span>
+          <span class="racha-texto" id="minutosSemanaTexto">min esta semana</span>
         </div>
         <div class="racha-bloque">
           <span class="racha-numero" id="diasMes">0</span>
           <span class="racha-texto" id="diasMesTexto">días este mes</span>
         </div>
       </div>
+    </section>
+
+    <!-- Objetivo semanal de estudio -->
+    <section class="tarjeta objetivo-semanal" aria-labelledby="tituloObjetivo">
+      <h2 id="tituloObjetivo">Objetivo semanal</h2>
+
+      <p class="objetivo-linea oculto" id="lineaObjetivo">Objetivo: <span id="valorObjetivo"></span></p>
+      <p class="objetivo-progreso" id="progresoObjetivo"></p>
+      <p class="objetivo-estado" id="estadoObjetivo" aria-live="polite" aria-atomic="true"></p>
+      <p class="objetivo-invitacion" id="invitacionObjetivo">Todavía no has fijado un objetivo semanal.</p>
+      <p class="error" id="errorProgresoObjetivo" aria-live="polite" aria-atomic="true"></p>
+
+      <form id="formularioObjetivo" novalidate>
+        <div class="campo">
+          <label for="minutosObjetivo">Objetivo semanal en minutos</label>
+          <input
+            type="text"
+            id="minutosObjetivo"
+            name="minutosObjetivo"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-describedby="errorObjetivo"
+          />
+        </div>
+
+        <p class="error" id="errorObjetivo" aria-live="polite" aria-atomic="true"></p>
+
+        <div class="objetivo-botones">
+          <button type="submit" id="botonObjetivo">Fijar objetivo</button>
+          <button type="button" id="botonQuitarObjetivo" class="boton-secundario oculto">Quitar objetivo</button>
+        </div>
+      </form>
     </section>
 
     <!-- Formulario para registrar una sesión -->

@@ -9,6 +9,8 @@
   --tinta: #16241e;
   --tinta-suave: #5c6b62;
   --linea: #ccd6cd;
+  /* Borde de control con contraste 3:1 sobre el papel (WCAG 1.4.11). */
+  --linea-control: #7a8981;
   --resaltador: #f2df4a;
   --rojo: #a33a2b;
   --rojo-oscuro: #862d21;
@@ -583,6 +585,113 @@ button:focus-visible {
   text-align: center;
 }
 
+/* ---------- Objetivo semanal ---------- */
+/* La tarjeta reutiliza el papel y el borde de .tarjeta; aquí solo se ordena
+   el resumen (objetivo, progreso, estado) y se separa del formulario. */
+.objetivo-linea,
+.objetivo-progreso,
+.objetivo-estado,
+.objetivo-invitacion {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.objetivo-linea {
+  color: var(--tinta-suave);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+
+#valorObjetivo {
+  color: var(--tinta);
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.objetivo-progreso {
+  margin-top: 2px;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Sello con el estado de cumplimiento: el texto es siempre el indicador. */
+.objetivo-estado {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 1px 9px 2px;
+  border: 1px solid var(--tinta-suave);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Sin estado no debe quedar un sello vacío ni un hueco. */
+.objetivo-estado:empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  line-height: 0;
+}
+
+.objetivo-invitacion {
+  margin-top: 4px;
+  color: var(--tinta-suave);
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+.objetivo-semanal .error {
+  margin: 10px 0 0;
+  min-height: 0;
+}
+
+.objetivo-semanal .error:empty {
+  margin: 0;
+}
+
+.objetivo-semanal form {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--linea);
+}
+
+.objetivo-semanal .campo {
+  margin-bottom: 0;
+}
+
+/* El campo se distingue del papel y mantiene un área táctil cómoda. */
+.objetivo-semanal .campo input {
+  min-height: 44px;
+  border-color: var(--linea-control);
+}
+
+.objetivo-semanal .campo input:focus {
+  border-color: var(--tinta);
+}
+
+.objetivo-botones {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.objetivo-botones button {
+  width: 100%;
+  min-height: 44px;
+}
+
 /* ---------- Modal ---------- */
 .modal {
   position: fixed;
@@ -686,5 +795,26 @@ button:focus-visible {
   .mapa-calor-leyenda {
     gap: 5px 10px;
     font-size: 0.6rem;
+  }
+
+  .objetivo-progreso {
+    font-size: 1.05rem;
+  }
+
+  .objetivo-estado {
+    font-size: 0.68rem;
+  }
+}
+
+/* Con espacio suficiente los botones del objetivo comparten fila. */
+@media (min-width: 480px) {
+  .objetivo-botones {
+    flex-direction: row;
+  }
+
+  .objetivo-botones button {
+    flex: 1;
+    min-width: 0;
+    width: auto;
   }
 }
