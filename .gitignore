@@ -1,0 +1,9 @@
+# Configuración y flujo de IA
+.agents/
+.opencode/
+opencode.json
+skills-lock.json
+AGENTS.md
+MEMORY.md
+specs/
+docs/constitution.md
